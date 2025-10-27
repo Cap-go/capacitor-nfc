@@ -1,0 +1,10 @@
+{
+  "appId": "app.capgo.pdfgenerator",
+  "appName": "PDF Generator Example",
+  "webDir": "dist",
+  "plugins": {
+    "SplashScreen": {
+      "launchAutoHide": false
+    }
+  }
+}

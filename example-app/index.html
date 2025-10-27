@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@capgo/capacitor-nfc Example</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <main class="container">
+      <h1>@capgo/capacitor-nfc Example</h1>
+      <p class="lead">Exercise NFC scanning, writing, and status events with the plugin linked locally.</p>
+
+      <section class="status-panel">
+        <div>
+          <h2>Adapter status</h2>
+          <p id="status-indicator" class="status-indicator status-unknown">Unknown</p>
+        </div>
+        <div>
+          <h2>Session</h2>
+          <p id="session-indicator" class="status-indicator status-inactive">Idle</p>
+        </div>
+      </section>
+
+      <section class="controls">
+        <button id="start-scan">Start scanning</button>
+        <button id="stop-scan" class="secondary">Stop scanning</button>
+        <button id="clear-log" class="secondary">Clear log</button>
+      </section>
+
+      <section class="write-card">
+        <h2>Write sample text</h2>
+        <p class="hint">Scanning must stay active with <code>invalidateAfterFirstRead = false</code> to write a tag.</p>
+        <label for="text-input">Text payload</label>
+        <input id="text-input" type="text" value="Hello from Capgo NFC!" />
+        <label for="lang-input">Language code</label>
+        <input id="lang-input" type="text" value="en" />
+        <button id="write-text" class="secondary">Write NDEF text record</button>
+      </section>
+
+      <section class="log-viewer">
+        <h2>Events</h2>
+        <pre id="log-output">Waiting for events…</pre>
+      </section>
+    </main>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
