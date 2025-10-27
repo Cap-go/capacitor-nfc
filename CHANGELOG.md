@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [7.0.2](https://github.com/Cap-go/capacitor-nfc/compare/7.0.1...7.0.2) (2025-10-27)
+
+
+### Bug Fixes
+
+* lint ([cd91cac](https://github.com/Cap-go/capacitor-nfc/commit/cd91cac48181ac7487211d86d248f4bb03ab7f58))
+
 ## 7.0.1 (2025-10-27)
 
 ## [7.1.3](https://github.com/Cap-go/capacitor-pdf-generator/compare/7.1.2...7.1.3) (2025-10-26)
