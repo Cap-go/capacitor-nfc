@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [7.0.4](https://github.com/Cap-go/capacitor-nfc/compare/7.0.3...7.0.4) (2025-10-27)
+
+
+### Bug Fixes
+
+* renovate capacitor dep ([992ec57](https://github.com/Cap-go/capacitor-nfc/commit/992ec57aca57fb9a363aa473cd41636b5fe560e8))
+
 ## [7.0.3](https://github.com/Cap-go/capacitor-nfc/compare/7.0.2...7.0.3) (2025-10-27)
 
 
