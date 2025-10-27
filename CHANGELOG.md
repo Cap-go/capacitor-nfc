@@ -2,6 +2,8 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## 7.0.1 (2025-10-27)
+
 ## [7.1.3](https://github.com/Cap-go/capacitor-pdf-generator/compare/7.1.2...7.1.3) (2025-10-26)
 
 
