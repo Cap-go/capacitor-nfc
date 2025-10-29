@@ -36,7 +36,7 @@ import org.json.JSONException;
 public class CapacitorNfcPlugin extends Plugin {
 
     private static final String TAG = "CapacitorNfcPlugin";
-    private static final String PLUGIN_VERSION = "0.0.1";
+    private static final String PLUGIN_VERSION = "7.0.5";
     private static final int DEFAULT_READER_FLAGS =
         NfcAdapter.FLAG_READER_NFC_A |
         NfcAdapter.FLAG_READER_NFC_B |
