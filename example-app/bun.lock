@@ -7,7 +7,7 @@
         "@capacitor/android": "7.0.0",
         "@capacitor/core": "latest",
         "@capacitor/ios": "7.0.0",
-        "@capgo/capacitor-pdf-generator": "file:..",
+        "@capgo/capacitor-nfc": "file:..",
       },
       "devDependencies": {
         "@capacitor/cli": "latest",
@@ -30,7 +30,7 @@
 
     "@capacitor/ios": ["@capacitor/ios@7.0.0", "", { "peerDependencies": { "@capacitor/core": "^7.0.0" } }, "sha512-FuCoTx2HRYPhIUOT+J87rHkjT4m1yNLsIaG5/qkt9JG5k3KIYATKbp8EHjtLAMqyJWJKBmjkjpFExNesr/t6kA=="],
 
-    "@capgo/capacitor-pdf-generator": ["@capgo/capacitor-pdf-generator@file:..", { "devDependencies": { "@capacitor/android": "^7.0.0", "@capacitor/cli": "^7.0.0", "@capacitor/core": "^7.0.0", "@capacitor/docgen": "^0.3.0", "@capacitor/ios": "^7.0.0", "@ionic/eslint-config": "^0.4.0", "@ionic/prettier-config": "^4.0.0", "@ionic/swiftlint-config": "^2.0.0", "@types/node": "^22.13.1", "eslint": "^8.57.0", "eslint-plugin-import": "^2.31.0", "husky": "^9.1.7", "prettier": "^3.4.2", "prettier-plugin-java": "^2.6.7", "rimraf": "^6.0.1", "rollup": "^4.34.6", "swiftlint": "^2.0.0", "typescript": "^5.7.3" }, "peerDependencies": { "@capacitor/core": ">=7.0.0" } }],
+    "@capgo/capacitor-nfc": ["@capgo/capacitor-nfc@file:..", { "devDependencies": { "@capacitor/android": "^7.0.0", "@capacitor/cli": "^7.0.0", "@capacitor/core": "^7.0.0", "@capacitor/docgen": "^0.3.0", "@capacitor/ios": "^7.0.0", "@ionic/eslint-config": "^0.4.0", "@ionic/prettier-config": "^4.0.0", "@ionic/swiftlint-config": "^2.0.0", "@types/node": "^22.13.1", "eslint": "^8.57.0", "eslint-plugin-import": "^2.31.0", "husky": "^9.1.7", "prettier": "^3.4.2", "prettier-plugin-java": "^2.6.7", "rimraf": "^6.0.1", "rollup": "^4.34.6", "swiftlint": "^2.0.0", "typescript": "^5.7.3" }, "peerDependencies": { "@capacitor/core": ">=7.0.0" } }],
 
     "@chevrotain/cst-dts-gen": ["@chevrotain/cst-dts-gen@11.0.3", "", { "dependencies": { "@chevrotain/gast": "11.0.3", "@chevrotain/types": "11.0.3", "lodash-es": "4.17.21" } }, "sha512-BvIKpRLeS/8UbfxXxgC33xOumsacaeCKAjAeLyOn7Pcp95HiRbrpl14S+9vaZLolnbssPIUuiUd8IvgkRyt6NQ=="],
 
