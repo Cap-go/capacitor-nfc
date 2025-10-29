@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [7.0.5](https://github.com/Cap-go/capacitor-nfc/compare/7.0.4...7.0.5) (2025-10-29)
+
+
+### Bug Fixes
+
+* CI/CD config ([0bd1758](https://github.com/Cap-go/capacitor-nfc/commit/0bd17587a05669daa5781df034dc656593f7919f))
+* model github action ([b7e05a2](https://github.com/Cap-go/capacitor-nfc/commit/b7e05a2e761bde36eaff7c3be19d0bcab210cf68))
+* update github action ([3410b61](https://github.com/Cap-go/capacitor-nfc/commit/3410b612ba87a3904dd3c3c42429f940f48d4dfa))
+
 ## [7.0.4](https://github.com/Cap-go/capacitor-nfc/compare/7.0.3...7.0.4) (2025-10-27)
 
 
