@@ -4,7 +4,7 @@ import UIKit
 
 @objc(NfcPlugin)
 public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
-    private let PLUGIN_VERSION: String = "7.0.5"
+    private let PLUGIN_VERSION: String = "7.0.6"
 
     public let identifier = "NfcPlugin"
     public let jsName = "CapacitorNfc"

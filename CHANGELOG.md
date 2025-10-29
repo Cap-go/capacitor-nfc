@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [7.0.6](https://github.com/Cap-go/capacitor-nfc/compare/7.0.5...7.0.6) (2025-10-29)
+
+
+### Bug Fixes
+
+* update package reference from capacitor-pdf-generator to capacitor-nfc ([b307570](https://github.com/Cap-go/capacitor-nfc/commit/b3075705e225656e8ad180db995d897f14cc26bb))
+* update plugin version to 7.0.5 in Android and iOS implementations ([d4ec690](https://github.com/Cap-go/capacitor-nfc/commit/d4ec69073273258fb39b732d720ccc272690d020))
+
 ## [7.0.5](https://github.com/Cap-go/capacitor-nfc/compare/7.0.4...7.0.5) (2025-10-29)
 
 
