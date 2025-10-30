@@ -4,7 +4,7 @@ import UIKit
 
 @objc(NfcPlugin)
 public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
-    private let PLUGIN_VERSION: String = "7.0.6"
+    private let pluginVersion: String = "7.0.6"
 
     public let identifier = "NfcPlugin"
     public let jsName = "CapacitorNfc"
@@ -124,7 +124,7 @@ public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc public func getPluginVersion(_ call: CAPPluginCall) {
         call.resolve([
-            "version": PLUGIN_VERSION
+            "version": pluginVersion
         ])
     }
 
