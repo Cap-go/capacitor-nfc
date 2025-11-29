@@ -142,10 +142,20 @@ writeButton.addEventListener('click', async () => {
   }
 });
 
-CapacitorNfc.addListener('nfcEvent', (event) => {
+CapacitorNfc.addListener('nfcEvent', async (event) => {
   sessionActive = true;
   updateSessionIndicator(true);
   appendLog('📡 Tag discovered', event);
+  
+  // Stop scanning after reading the tag
+  try {
+    await CapacitorNfc.stopScanning();
+    sessionActive = false;
+    updateSessionIndicator(false);
+    appendLog('🛑 Scanning stopped after reading tag');
+  } catch (error) {
+    appendLog('⚠️ Failed to stop scanning after reading tag', error);
+  }
 });
 
 CapacitorNfc.addListener('nfcStateChange', (event) => {
