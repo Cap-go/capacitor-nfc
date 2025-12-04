@@ -10,8 +10,10 @@ import android.nfc.NdefMessage;
 import android.nfc.NdefRecord;
 import android.nfc.NfcAdapter;
 import android.nfc.Tag;
+import android.nfc.tech.MifareUltralight;
 import android.nfc.tech.Ndef;
 import android.nfc.tech.NdefFormatable;
+import android.nfc.tech.NfcA;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
@@ -356,21 +358,214 @@ public class CapacitorNfcPlugin extends Plugin {
             return;
         }
 
-        Ndef ndef = Ndef.get(tag);
-        NdefMessage cachedMessage = null;
-        if (ndef != null) {
-            try {
-                cachedMessage = ndef.getCachedNdefMessage();
-            } catch (Exception ex) {
-                Log.w(TAG, "Unable to fetch cached NDEF message", ex);
+        NdefMessage message = null;
+        String[] techList = tag.getTechList();
+
+        // Check tech list first - if MIFARE Ultralight is present, prioritize it
+        // (tags can become stale very quickly, so we need to read immediately)
+        boolean hasMifareUltralight = Arrays.asList(techList).contains("android.nfc.tech.MifareUltralight");
+
+        if (hasMifareUltralight) {
+            // Try MIFARE Ultralight first - read immediately before tag becomes stale
+            MifareUltralight mifare = MifareUltralight.get(tag);
+            if (mifare != null) {
+                message = readNdefFromMifareUltralight(mifare);
+            }
+        }
+
+        // If no message from MIFARE, try standard NDEF
+        if (message == null) {
+            Ndef ndef = Ndef.get(tag);
+            if (ndef != null) {
+                // First try to get cached message (fast path)
+                try {
+                    message = ndef.getCachedNdefMessage();
+                } catch (Exception ex) {
+                    // Ignore - will try to read directly
+                }
+
+                // If no cached message, read it synchronously while tag is in range
+                if (message == null) {
+                    try {
+                        ndef.connect();
+                        message = ndef.getNdefMessage();
+                        ndef.close();
+                    } catch (IOException | FormatException ex) {
+                        try {
+                            ndef.close();
+                        } catch (IOException closeEx) {
+                            // Ignore close errors
+                        }
+                    }
+                }
             }
         }
 
         lastTag.set(tag);
-        lastMessage.set(cachedMessage);
+        lastMessage.set(message);
+        emitTagEvent(tag, message);
+    }
 
-        JSObject tagJson = NfcJsonConverter.tagToJSObject(tag, cachedMessage);
-        String eventType = determineEventType(tag, cachedMessage);
+    /**
+     * Reads NDEF message from MIFARE Ultralight tag by reading raw pages.
+     *
+     * Based on NFC Forum Type 2 Tag Operation specification:
+     * - NDEF data is stored in TLV (Type-Length-Value) format starting at page 4
+     * - TLV Type 0x03 indicates NDEF message
+     * - Length encoding: single byte if < 0xFF, or 0xFF + 2-byte length if >= 0xFF
+     *
+     * References:
+     * - Android MifareUltralight API: https://developer.android.com/reference/android/nfc/tech/MifareUltralight
+     * - NFC Forum Type 2 Tag Operation specification
+     */
+    private NdefMessage readNdefFromMifareUltralight(MifareUltralight mifare) {
+        try {
+            // Connect immediately - tag can become stale quickly
+            mifare.connect();
+
+            // Log tag variant for debugging
+            int tagType = mifare.getType();
+            String variantName;
+            switch (tagType) {
+                case MifareUltralight.TYPE_ULTRALIGHT:
+                    variantName = "MIFARE Ultralight (standard, 64 bytes)";
+                    break;
+                case MifareUltralight.TYPE_ULTRALIGHT_C:
+                    variantName = "MIFARE Ultralight C (up to 192 bytes)";
+                    break;
+                default:
+                    variantName = "MIFARE Ultralight (type: " + tagType + ", unknown variant)";
+                    break;
+            }
+            Log.d(TAG, "MIFARE Ultralight tag variant: " + variantName);
+
+            // Read pages 4-7 first (readPages reads 4 pages = 16 bytes at a time)
+            // This contains the TLV header
+            byte[] firstPages = mifare.readPages(4);
+            if (firstPages == null || firstPages.length < 4) {
+                mifare.close();
+                return null;
+            }
+
+            // Check for NDEF TLV (Type = 0x03 per NFC Forum spec)
+            if (firstPages[0] != 0x03) {
+                mifare.close();
+                return null;
+            }
+
+            // Parse TLV length field
+            int ndefLength;
+            int tlvHeaderSize;
+            if ((firstPages[1] & 0xFF) < 0xFF) {
+                // Short format: single byte length
+                ndefLength = firstPages[1] & 0xFF;
+                tlvHeaderSize = 2; // Type (1 byte) + Length (1 byte)
+            } else {
+                // Extended format: 0xFF + 2-byte length
+                if (firstPages.length < 4) {
+                    mifare.close();
+                    return null;
+                }
+                ndefLength = ((firstPages[2] & 0xFF) << 8) | (firstPages[3] & 0xFF);
+                tlvHeaderSize = 4; // Type (1 byte) + 0xFF (1 byte) + Length (2 bytes)
+            }
+
+            if (ndefLength == 0 || ndefLength > 1024) {
+                // Reasonable upper limit
+                mifare.close();
+                return null;
+            }
+
+            // Calculate total bytes needed (TLV header + NDEF data)
+            int totalBytesNeeded = tlvHeaderSize + ndefLength;
+            int totalPagesNeeded = (totalBytesNeeded + 3) / 4; // Round up to pages
+
+            // Read all necessary pages sequentially
+            // Standard MIFARE Ultralight: pages 4-15 (48 bytes)
+            // MIFARE Ultralight EV1: up to 256 pages (1024 bytes)
+            // MIFARE Ultralight C: up to 256 pages (1024 bytes)
+            byte[] allData = new byte[totalPagesNeeded * 4];
+            int bytesRead = 0;
+            int currentPage = 4;
+
+            // Copy first 16 bytes we already read
+            int bytesToCopy = Math.min(firstPages.length, allData.length);
+            System.arraycopy(firstPages, 0, allData, 0, bytesToCopy);
+            bytesRead = bytesToCopy;
+            currentPage += 4; // Move to page 8
+
+            // Read remaining pages if needed
+            // Support up to page 256 (MIFARE Ultralight EV1/C maximum)
+            while (bytesRead < totalBytesNeeded && currentPage < 260) {
+                try {
+                    byte[] pages = mifare.readPages(currentPage);
+                    if (pages == null || pages.length == 0) {
+                        // No more pages available - tag might not support this many pages
+                        break;
+                    }
+
+                    int bytesNeeded = totalBytesNeeded - bytesRead;
+                    int bytesToRead = Math.min(pages.length, bytesNeeded);
+                    System.arraycopy(pages, 0, allData, bytesRead, bytesToRead);
+                    bytesRead += bytesToRead;
+                    currentPage += 4; // readPages reads 4 pages at a time
+                } catch (IOException e) {
+                    // Tag might not support reading beyond this page
+                    // This is normal for tags with fewer pages than needed
+                    break;
+                }
+            }
+
+            mifare.close();
+
+            // Check if we have enough data
+            if (bytesRead < totalBytesNeeded) {
+                // Incomplete read - tag might not have enough pages or was removed
+                Log.w(
+                    TAG,
+                    String.format(
+                        "Incomplete NDEF read: read %d bytes, needed %d bytes (stopped at page %d, variant: %s)",
+                        bytesRead,
+                        totalBytesNeeded,
+                        currentPage,
+                        variantName
+                    )
+                );
+                return null;
+            }
+
+            // Extract NDEF data (skip TLV header)
+            byte[] ndefData = new byte[ndefLength];
+            System.arraycopy(allData, tlvHeaderSize, ndefData, 0, ndefLength);
+
+            // Parse NDEF message
+            try {
+                return new NdefMessage(ndefData);
+            } catch (FormatException e) {
+                Log.w(TAG, "Failed to parse NDEF message from MIFARE Ultralight", e);
+                return null;
+            }
+        } catch (SecurityException e) {
+            // Tag became stale - this happens if tag is removed or too much time passed
+            try {
+                mifare.close();
+            } catch (Exception closeEx) {
+                // Ignore close errors
+            }
+            return null;
+        } catch (IOException e) {
+            try {
+                mifare.close();
+            } catch (IOException closeEx) {
+                // Ignore close errors
+            }
+            return null;
+        }
+    }
+
+    private void emitTagEvent(Tag tag, NdefMessage message) {
+        JSObject tagJson = NfcJsonConverter.tagToJSObject(tag, message);
+        String eventType = determineEventType(tag, message);
         JSObject event = new JSObject();
         event.put("type", eventType);
         event.put("tag", tagJson);
