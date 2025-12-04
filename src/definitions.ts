@@ -46,6 +46,10 @@ export interface NdefRecord {
 
 /**
  * Representation of the full tag information returned by the native layers.
+ *
+ * Supports standard NFC Forum tags as well as MIFARE Ultralight cards (including
+ * EV1 and NTAG variants). NDEF data is automatically extracted from MIFARE Ultralight
+ * tags when available.
  */
 export interface NfcTag {
   /**
@@ -57,7 +61,7 @@ export interface NfcTag {
    */
   techTypes?: string[];
   /**
-   * Human readable tag type when available (e.g. `NFC Forum Type 2`).
+   * Human readable tag type when available (e.g. `NFC Forum Type 2`, `MIFARE Ultralight`).
    */
   type?: string | null;
   /**

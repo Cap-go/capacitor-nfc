@@ -10,6 +10,11 @@ Native NFC tag detection, reading, and writing for Capacitor apps on iOS and And
 
 Modern Capacitor port of the battle-tested [phonegap-nfc](https://github.com/chariotsolutions/phonegap-nfc) plugin, aligned with Capgo conventions and tooling.
 
+## Supported Tag Types
+
+- **Standard NFC Forum Tags** (Type 1-4)
+- **MIFARE Ultralight** - Full support for reading NDEF data from MIFARE Ultralight tags, including EV1 and NTAG variants. The plugin automatically detects MIFARE Ultralight cards and extracts NDEF messages in addition to standard NFC tags.
+
 ## Documentation
 
 The most complete documentation will live on the Capgo docs portal. Until then, explore the TypeScript definitions (`src/definitions.ts`) and run the included example app for a tour of the API.
@@ -337,15 +342,19 @@ Generic NFC discovery event dispatched by the plugin.
 
 Representation of the full tag information returned by the native layers.
 
-| Prop                  | Type                              | Description                                                           |
-| --------------------- | --------------------------------- | --------------------------------------------------------------------- |
-| **`id`**              | <code>number[]</code>             | Raw identifier bytes for the tag.                                     |
-| **`techTypes`**       | <code>string[]</code>             | List of Android tech strings (e.g. `android.nfc.tech.Ndef`).          |
-| **`type`**            | <code>string \| null</code>       | Human readable tag type when available (e.g. `NFC Forum Type 2`).     |
-| **`maxSize`**         | <code>number \| null</code>       | Maximum writable size in bytes for tags that expose NDEF information. |
-| **`isWritable`**      | <code>boolean \| null</code>      | Indicates whether the tag can be written to.                          |
-| **`canMakeReadOnly`** | <code>boolean \| null</code>      | Indicates whether the tag can be permanently locked.                  |
-| **`ndefMessage`**     | <code>NdefRecord[] \| null</code> | Array of NDEF records discovered on the tag.                          |
+Supports standard NFC Forum tags as well as MIFARE Ultralight cards (including
+EV1 and NTAG variants). NDEF data is automatically extracted from MIFARE Ultralight
+tags when available.
+
+| Prop                  | Type                              | Description                                                                            |
+| --------------------- | --------------------------------- | -------------------------------------------------------------------------------------- |
+| **`id`**              | <code>number[]</code>             | Raw identifier bytes for the tag.                                                      |
+| **`techTypes`**       | <code>string[]</code>             | List of Android tech strings (e.g. `android.nfc.tech.Ndef`).                           |
+| **`type`**            | <code>string \| null</code>       | Human readable tag type when available (e.g. `NFC Forum Type 2`, `MIFARE Ultralight`). |
+| **`maxSize`**         | <code>number \| null</code>       | Maximum writable size in bytes for tags that expose NDEF information.                  |
+| **`isWritable`**      | <code>boolean \| null</code>      | Indicates whether the tag can be written to.                                           |
+| **`canMakeReadOnly`** | <code>boolean \| null</code>      | Indicates whether the tag can be permanently locked.                                   |
+| **`ndefMessage`**     | <code>NdefRecord[] \| null</code> | Array of NDEF records discovered on the tag.                                           |
 
 
 #### NfcStateChangeEvent
