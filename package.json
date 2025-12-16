@@ -24,6 +24,7 @@
   "bugs": {
     "url": "https://github.com/Cap-go/capacitor-nfc/issues"
   },
+  "homepage": "https://capgo.app/docs/plugins/nfc/",
   "keywords": [
     "capacitor",
     "capacitor-plugin",
