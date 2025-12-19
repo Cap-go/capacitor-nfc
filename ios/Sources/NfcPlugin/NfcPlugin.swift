@@ -274,7 +274,7 @@ public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
         if let miFare = tag as? NFCMiFareTag {
             return miFare.identifier
         }
-        if #available(iOS 13.3, *), let iso7816 = tag as? NFCISO7816Tag {
+        if let iso7816 = tag as? NFCISO7816Tag {
             return iso7816.identifier
         }
         if let iso15693 = tag as? NFCISO15693Tag {
