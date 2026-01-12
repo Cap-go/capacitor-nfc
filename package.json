@@ -1,6 +1,6 @@
 {
   "name": "@capgo/capacitor-nfc",
-  "version": "8.0.5",
+  "version": "8.0.6",
   "description": "Native NFC tag discovery, reading and writing for Capacitor apps on iOS and Android.",
   "main": "dist/plugin.cjs.js",
   "module": "dist/esm/index.js",
