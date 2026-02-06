@@ -90,7 +90,7 @@ public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc public func write(_ call: CAPPluginCall) {
-        guard let tag = currentTag else {
+        guard currentTag != nil else {
             call.reject("No active NFC session or tag. Call startScanning and present a tag before writing.")
             return
         }
@@ -109,7 +109,7 @@ public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc public func erase(_ call: CAPPluginCall) {
-        guard let tag = currentTag else {
+        guard currentTag != nil else {
             call.reject("No active NFC session or tag. Call startScanning and present a tag before erasing.")
             return
         }
@@ -394,7 +394,7 @@ extension NfcPlugin: NFCNDEFReaderSessionDelegate {
                 self.notifyListeners("nfcStateChange", data: payload, retainUntilConsumed: true)
             }
         }
-        readerSession = nil
+        ndefReaderSession = nil
     }
 
     public func readerSession(_ session: NFCNDEFReaderSession, didDetect tags: [NFCNDEFTag]) {
@@ -478,6 +478,12 @@ extension NfcPlugin: NFCTagReaderSessionDelegate {
     }
 
     public func tagReaderSession(_ session: NFCTagReaderSession, didDetect tags: [NFCTag]) {
+        // Handle multiple tags case - CoreNFC recommends invalidating with a message
+        if tags.count > 1 {
+            session.invalidate(errorMessage: "More than one tag detected. Please present only one tag.")
+            return
+        }
+        
         guard let firstTag = tags.first else {
             return
         }
@@ -517,12 +523,12 @@ extension NfcPlugin: NFCTagReaderSessionDelegate {
 
             if error == nil && status != .notSupported {
                 // Tag supports NDEF, try to read it
-                tag.readNDEF { [weak self] message, readError in
+                tag.readNDEF { [weak self] message, _ in
                     guard let self else {
                         return
                     }
 
-                    if let readError {
+                    if message == nil {
                         // NDEF read failed, still emit tag with UID
                         self.emitTagEvent(tag: tag, message: nil, session: session)
                     } else {
