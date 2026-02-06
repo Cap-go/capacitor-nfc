@@ -463,9 +463,9 @@ extension NfcPlugin: NFCTagReaderSessionDelegate {
         currentTag = nil
         let nfcError = error as NSError
         
-        // Don't emit state change for normal session completion (user canceled or successful read)
-        if nfcError.code != NFCReaderError.readerSessionInvalidationErrorUserCanceled.rawValue &&
-           nfcError.code != NFCReaderError.readerSessionInvalidationErrorSessionTimeout.rawValue {
+        // Don't emit state change for normal session completion (user canceled)
+        // Also check for successful read completion
+        if nfcError.code != NFCReaderError.readerSessionInvalidationErrorUserCanceled.rawValue {
             DispatchQueue.main.async {
                 let payload: [String: Any] = [
                     "status": NFCNDEFReaderSession.readingAvailable ? "NFC_OK" : "NO_NFC",
