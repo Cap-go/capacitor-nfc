@@ -21,10 +21,12 @@ public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "getPluginVersion", returnType: CAPPluginReturnPromise)
     ]
 
-    private var readerSession: NFCNDEFReaderSession?
+    private var ndefReaderSession: NFCNDEFReaderSession?
+    private var tagReaderSession: NFCTagReaderSession?
     private let sessionQueue = DispatchQueue(label: "app.capgo.nfc.session")
     private var currentTag: NFCNDEFTag?
     private var invalidateAfterFirstRead = true
+    private var sessionType: String = "ndef"
 
     @objc public func startScanning(_ call: CAPPluginCall) {
         #if targetEnvironment(simulator)
@@ -38,14 +40,38 @@ public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
 
         invalidateAfterFirstRead = call.getBool("invalidateAfterFirstRead", true)
         let alertMessage = call.getString("alertMessage")
+        sessionType = call.getString("iosSessionType", "ndef")
 
         DispatchQueue.main.async {
-            self.readerSession?.invalidate()
-            self.readerSession = NFCNDEFReaderSession(delegate: self, queue: self.sessionQueue, invalidateAfterFirstRead: self.invalidateAfterFirstRead)
-            if let alertMessage, !alertMessage.isEmpty {
-                self.readerSession?.alertMessage = alertMessage
+            // Invalidate any existing sessions
+            self.ndefReaderSession?.invalidate()
+            self.ndefReaderSession = nil
+            self.tagReaderSession?.invalidate()
+            self.tagReaderSession = nil
+
+            if self.sessionType == "tag" {
+                // Use NFCTagReaderSession for raw tag support
+                self.tagReaderSession = NFCTagReaderSession(
+                    pollingOption: [.iso14443, .iso15693, .iso18092],
+                    delegate: self,
+                    queue: self.sessionQueue
+                )
+                if let alertMessage, !alertMessage.isEmpty {
+                    self.tagReaderSession?.alertMessage = alertMessage
+                }
+                self.tagReaderSession?.begin()
+            } else {
+                // Use NFCNDEFReaderSession (default behavior)
+                self.ndefReaderSession = NFCNDEFReaderSession(
+                    delegate: self,
+                    queue: self.sessionQueue,
+                    invalidateAfterFirstRead: self.invalidateAfterFirstRead
+                )
+                if let alertMessage, !alertMessage.isEmpty {
+                    self.ndefReaderSession?.alertMessage = alertMessage
+                }
+                self.ndefReaderSession?.begin()
             }
-            self.readerSession?.begin()
         }
 
         call.resolve()
@@ -54,15 +80,17 @@ public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc public func stopScanning(_ call: CAPPluginCall) {
         DispatchQueue.main.async {
-            self.readerSession?.invalidate()
-            self.readerSession = nil
+            self.ndefReaderSession?.invalidate()
+            self.ndefReaderSession = nil
+            self.tagReaderSession?.invalidate()
+            self.tagReaderSession = nil
             self.currentTag = nil
         }
         call.resolve()
     }
 
     @objc public func write(_ call: CAPPluginCall) {
-        guard let session = readerSession, let tag = currentTag else {
+        guard currentTag != nil else {
             call.reject("No active NFC session or tag. Call startScanning and present a tag before writing.")
             return
         }
@@ -74,21 +102,40 @@ public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
 
         do {
             let message = try buildMessage(from: rawRecords)
-            performWrite(message: message, on: tag, session: session, call: call)
+            performWriteToCurrentTag(message: message, call: call)
         } catch {
             call.reject("Invalid NDEF records payload.", nil, error)
         }
     }
 
     @objc public func erase(_ call: CAPPluginCall) {
-        guard let session = readerSession, let tag = currentTag else {
+        guard currentTag != nil else {
             call.reject("No active NFC session or tag. Call startScanning and present a tag before erasing.")
             return
         }
 
         let emptyRecord = NFCNDEFPayload(format: .empty, type: Data(), identifier: Data(), payload: Data())
         let message = NFCNDEFMessage(records: [emptyRecord])
-        performWrite(message: message, on: tag, session: session, call: call)
+        performWriteToCurrentTag(message: message, call: call)
+    }
+
+    private func performWriteToCurrentTag(message: NFCNDEFMessage, call: CAPPluginCall) {
+        guard let tag = currentTag else {
+            call.reject("No active NFC session or tag.")
+            return
+        }
+        
+        if let ndefSession = ndefReaderSession {
+            // For NDEF session, we need to connect to the tag first
+            performWrite(message: message, on: tag, session: ndefSession, call: call)
+        } else if tagReaderSession != nil {
+            // For Tag session, tag remains connected from discovery
+            // Note: If the tag is removed and re-presented, the session will detect it as a new tag
+            // and performWriteToTag may fail. Users should keep the tag in place after detection.
+            performWriteToTag(message: message, on: tag, call: call)
+        } else {
+            call.reject("No active NFC session.")
+        }
     }
 
     @objc public func makeReadOnly(_ call: CAPPluginCall) {
@@ -142,43 +189,47 @@ public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
                 return
             }
 
-            tag.queryNDEFStatus { status, capacity, statusError in
-                if let statusError {
+            self.performWriteToTag(message: message, on: tag, call: call)
+        }
+    }
+
+    private func performWriteToTag(message: NFCNDEFMessage, on tag: NFCNDEFTag, call: CAPPluginCall) {
+        tag.queryNDEFStatus { status, capacity, statusError in
+            if let statusError {
+                DispatchQueue.main.async {
+                    call.reject("Failed to query tag status.", nil, statusError)
+                }
+                return
+            }
+
+            switch status {
+            case .readWrite:
+                if capacity < message.length {
                     DispatchQueue.main.async {
-                        call.reject("Failed to query tag status.", nil, statusError)
+                        call.reject("Tag capacity is insufficient for the provided message.")
                     }
                     return
                 }
-
-                switch status {
-                case .readWrite:
-                    if capacity < message.length {
-                        DispatchQueue.main.async {
-                            call.reject("Tag capacity is insufficient for the provided message.")
-                        }
-                        return
-                    }
-                    tag.writeNDEF(message) { writeError in
-                        DispatchQueue.main.async {
-                            if let writeError {
-                                call.reject("Failed to write NDEF message.", nil, writeError)
-                            } else {
-                                call.resolve()
-                            }
+                tag.writeNDEF(message) { writeError in
+                    DispatchQueue.main.async {
+                        if let writeError {
+                            call.reject("Failed to write NDEF message.", nil, writeError)
+                        } else {
+                            call.resolve()
                         }
                     }
-                case .readOnly:
-                    DispatchQueue.main.async {
-                        call.reject("Tag is read only.")
-                    }
-                case .notSupported:
-                    DispatchQueue.main.async {
-                        call.reject("Tag does not support NDEF.")
-                    }
-                @unknown default:
-                    DispatchQueue.main.async {
-                        call.reject("Unknown tag status.")
-                    }
+                }
+            case .readOnly:
+                DispatchQueue.main.async {
+                    call.reject("Tag is read only.")
+                }
+            case .notSupported:
+                DispatchQueue.main.async {
+                    call.reject("Tag does not support NDEF.")
+                }
+            @unknown default:
+                DispatchQueue.main.async {
+                    call.reject("Unknown tag status.")
                 }
             }
         }
@@ -343,7 +394,7 @@ extension NfcPlugin: NFCNDEFReaderSessionDelegate {
                 self.notifyListeners("nfcStateChange", data: payload, retainUntilConsumed: true)
             }
         }
-        readerSession = nil
+        ndefReaderSession = nil
     }
 
     public func readerSession(_ session: NFCNDEFReaderSession, didDetect tags: [NFCNDEFTag]) {
@@ -399,6 +450,140 @@ extension NfcPlugin: NFCNDEFReaderSessionDelegate {
             ]
         ]
         notify(event: event)
+    }
+}
+
+// MARK: - NFCTagReaderSessionDelegate
+extension NfcPlugin: NFCTagReaderSessionDelegate {
+    public func tagReaderSessionDidBecomeActive(_ session: NFCTagReaderSession) {
+        // Session became active, ready to detect tags
+    }
+
+    public func tagReaderSession(_ session: NFCTagReaderSession, didInvalidateWithError error: Error) {
+        currentTag = nil
+        let nfcError = error as NSError
+        
+        // Don't emit state change for normal session completion (user canceled)
+        // Also check for successful read completion
+        if nfcError.code != NFCReaderError.readerSessionInvalidationErrorUserCanceled.rawValue {
+            DispatchQueue.main.async {
+                let payload: [String: Any] = [
+                    "status": NFCNDEFReaderSession.readingAvailable ? "NFC_OK" : "NO_NFC",
+                    "enabled": NFCNDEFReaderSession.readingAvailable
+                ]
+                self.notifyListeners("nfcStateChange", data: payload, retainUntilConsumed: true)
+            }
+        }
+        tagReaderSession = nil
+    }
+
+    public func tagReaderSession(_ session: NFCTagReaderSession, didDetect tags: [NFCTag]) {
+        // Handle multiple tags case - CoreNFC recommends invalidating with a message
+        if tags.count > 1 {
+            session.invalidate(errorMessage: "More than one tag detected. Please present only one tag.")
+            return
+        }
+        
+        guard let firstTag = tags.first else {
+            return
+        }
+
+        session.connect(to: firstTag) { [weak self] error in
+            guard let self else {
+                return
+            }
+
+            if let error {
+                session.invalidate(errorMessage: "Failed to connect to the tag: \(error.localizedDescription)")
+                return
+            }
+
+            // Handle different tag types
+            switch firstTag {
+            case .miFare(let mifareTag):
+                self.processTag(mifareTag, session: session)
+            case .iso7816(let iso7816Tag):
+                self.processTag(iso7816Tag, session: session)
+            case .iso15693(let iso15693Tag):
+                self.processTag(iso15693Tag, session: session)
+            case .feliCa(let feliCaTag):
+                self.processTag(feliCaTag, session: session)
+            @unknown default:
+                session.invalidate(errorMessage: "Unsupported tag type")
+            }
+        }
+    }
+
+    private func processTag(_ tag: NFCNDEFTag, session: NFCTagReaderSession) {
+        // Try to read NDEF if available, otherwise emit tag with UID only
+        tag.queryNDEFStatus { [weak self] status, capacity, error in
+            guard let self else {
+                return
+            }
+
+            if error == nil && status != .notSupported {
+                // Tag supports NDEF, try to read it
+                tag.readNDEF { [weak self] message, _ in
+                    guard let self else {
+                        return
+                    }
+
+                    if message == nil {
+                        // NDEF read failed, still emit tag with UID
+                        self.emitTagEvent(tag: tag, message: nil, session: session)
+                    } else {
+                        // Successfully read NDEF
+                        self.currentTag = tag
+                        let event = self.buildEvent(tag: tag, status: status, capacity: capacity, message: message)
+                        self.notify(event: event)
+                        if self.invalidateAfterFirstRead {
+                            session.invalidate()
+                        }
+                    }
+                }
+            } else {
+                // Tag doesn't support NDEF or query failed - just emit UID
+                self.emitTagEvent(tag: tag, message: nil, session: session)
+            }
+        }
+    }
+
+    private func emitTagEvent(tag: NFCNDEFTag, message: NFCNDEFMessage?, session: NFCTagReaderSession) {
+        // Save the current tag for writing
+        currentTag = tag
+
+        var tagInfo: [String: Any] = [:]
+        
+        // Extract and add the tag ID (UID)
+        if let identifierData = extractIdentifier(from: tag) {
+            tagInfo["id"] = array(from: identifierData)
+        }
+        
+        tagInfo["techTypes"] = detectTechTypes(for: tag)
+        tagInfo["type"] = translateType(for: tag)
+
+        if let message {
+            tagInfo["isWritable"] = true
+            tagInfo["ndefMessage"] = message.records.map { record in
+                [
+                    "tnf": NSNumber(value: record.typeNameFormat.rawValue),
+                    "type": array(from: record.type),
+                    "id": array(from: record.identifier),
+                    "payload": array(from: record.payload)
+                ].compactMapValues { $0 }
+            }
+        }
+
+        let event: [String: Any] = [
+            "type": message != nil ? "ndef" : "tag",
+            "tag": tagInfo
+        ]
+        
+        notify(event: event)
+        
+        if invalidateAfterFirstRead {
+            session.invalidate()
+        }
     }
 }
 
