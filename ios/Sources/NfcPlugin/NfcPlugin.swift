@@ -102,15 +102,7 @@ public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
 
         do {
             let message = try buildMessage(from: rawRecords)
-            
-            // For NFCTagReaderSession, we need a reference to the session
-            if let tagSession = tagReaderSession {
-                performWriteWithTagSession(message: message, on: tag, session: tagSession, call: call)
-            } else if let ndefSession = ndefReaderSession {
-                performWrite(message: message, on: tag, session: ndefSession, call: call)
-            } else {
-                call.reject("No active NFC session.")
-            }
+            performWriteToCurrentTag(message: message, call: call)
         } catch {
             call.reject("Invalid NDEF records payload.", nil, error)
         }
@@ -124,11 +116,21 @@ public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
 
         let emptyRecord = NFCNDEFPayload(format: .empty, type: Data(), identifier: Data(), payload: Data())
         let message = NFCNDEFMessage(records: [emptyRecord])
+        performWriteToCurrentTag(message: message, call: call)
+    }
+
+    private func performWriteToCurrentTag(message: NFCNDEFMessage, call: CAPPluginCall) {
+        guard let tag = currentTag else {
+            call.reject("No active NFC session or tag.")
+            return
+        }
         
-        if let tagSession = tagReaderSession {
-            performWriteWithTagSession(message: message, on: tag, session: tagSession, call: call)
-        } else if let ndefSession = ndefReaderSession {
+        if let ndefSession = ndefReaderSession {
+            // For NDEF session, we need to connect to the tag first
             performWrite(message: message, on: tag, session: ndefSession, call: call)
+        } else if tagReaderSession != nil {
+            // For Tag session, tag is already connected
+            performWriteToTag(message: message, on: tag, call: call)
         } else {
             call.reject("No active NFC session.")
         }
@@ -187,11 +189,6 @@ public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
 
             self.performWriteToTag(message: message, on: tag, call: call)
         }
-    }
-
-    private func performWriteWithTagSession(message: NFCNDEFMessage, on tag: NFCNDEFTag, session: NFCTagReaderSession, call: CAPPluginCall) {
-        // Note: Tag should already be connected from the discovery phase
-        performWriteToTag(message: message, on: tag, call: call)
     }
 
     private func performWriteToTag(message: NFCNDEFMessage, on tag: NFCNDEFTag, call: CAPPluginCall) {
@@ -496,56 +493,40 @@ extension NfcPlugin: NFCTagReaderSessionDelegate {
             // Handle different tag types
             switch firstTag {
             case .miFare(let mifareTag):
-                self.handleMiFareTag(mifareTag, session: session)
+                self.processTag(mifareTag, session: session)
             case .iso7816(let iso7816Tag):
-                self.handleISO7816Tag(iso7816Tag, session: session)
+                self.processTag(iso7816Tag, session: session)
             case .iso15693(let iso15693Tag):
-                self.handleISO15693Tag(iso15693Tag, session: session)
+                self.processTag(iso15693Tag, session: session)
             case .feliCa(let feliCaTag):
-                self.handleFeliCaTag(feliCaTag, session: session)
+                self.processTag(feliCaTag, session: session)
             @unknown default:
                 session.invalidate(errorMessage: "Unsupported tag type")
             }
         }
     }
 
-    private func handleMiFareTag(_ mifareTag: NFCMiFareTag, session: NFCTagReaderSession) {
-        readNDEFFromTag(mifareTag, session: session)
-    }
-
-    private func handleISO7816Tag(_ iso7816Tag: NFCISO7816Tag, session: NFCTagReaderSession) {
-        readNDEFFromTag(iso7816Tag, session: session)
-    }
-
-    private func handleISO15693Tag(_ iso15693Tag: NFCISO15693Tag, session: NFCTagReaderSession) {
-        readNDEFFromTag(iso15693Tag, session: session)
-    }
-
-    private func handleFeliCaTag(_ feliCaTag: NFCFeliCaTag, session: NFCTagReaderSession) {
-        readNDEFFromTag(feliCaTag, session: session)
-    }
-
-    private func readNDEFFromTag(_ ndefTag: NFCNDEFTag, session: NFCTagReaderSession) {
-        // Try to read NDEF if available
-        ndefTag.queryNDEFStatus { [weak self] status, capacity, error in
+    private func processTag(_ tag: NFCNDEFTag, session: NFCTagReaderSession) {
+        // Try to read NDEF if available, otherwise emit tag with UID only
+        tag.queryNDEFStatus { [weak self] status, capacity, error in
             guard let self else {
                 return
             }
 
             if error == nil && status != .notSupported {
                 // Tag supports NDEF, try to read it
-                ndefTag.readNDEF { [weak self] message, readError in
+                tag.readNDEF { [weak self] message, readError in
                     guard let self else {
                         return
                     }
 
                     if let readError {
                         // NDEF read failed, still emit tag with UID
-                        self.emitTagEvent(ndefTag: ndefTag, message: nil, session: session)
+                        self.emitTagEvent(tag: tag, message: nil, session: session)
                     } else {
                         // Successfully read NDEF
-                        self.currentTag = ndefTag
-                        let event = self.buildEvent(tag: ndefTag, status: status, capacity: capacity, message: message)
+                        self.currentTag = tag
+                        let event = self.buildEvent(tag: tag, status: status, capacity: capacity, message: message)
                         self.notify(event: event)
                         if self.invalidateAfterFirstRead {
                             session.invalidate()
@@ -554,24 +535,24 @@ extension NfcPlugin: NFCTagReaderSessionDelegate {
                 }
             } else {
                 // Tag doesn't support NDEF or query failed - just emit UID
-                self.emitTagEvent(ndefTag: ndefTag, message: nil, session: session)
+                self.emitTagEvent(tag: tag, message: nil, session: session)
             }
         }
     }
 
-    private func emitTagEvent(ndefTag: NFCNDEFTag, message: NFCNDEFMessage?, session: NFCTagReaderSession) {
+    private func emitTagEvent(tag: NFCNDEFTag, message: NFCNDEFMessage?, session: NFCTagReaderSession) {
         // Save the current tag for writing
-        currentTag = ndefTag
+        currentTag = tag
 
         var tagInfo: [String: Any] = [:]
         
         // Extract and add the tag ID (UID)
-        if let identifierData = extractIdentifier(from: ndefTag) {
+        if let identifierData = extractIdentifier(from: tag) {
             tagInfo["id"] = array(from: identifierData)
         }
         
-        tagInfo["techTypes"] = detectTechTypes(for: ndefTag)
-        tagInfo["type"] = translateType(for: ndefTag)
+        tagInfo["techTypes"] = detectTechTypes(for: tag)
+        tagInfo["type"] = translateType(for: tag)
 
         if let message {
             tagInfo["isWritable"] = true
