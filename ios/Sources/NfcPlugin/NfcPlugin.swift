@@ -129,7 +129,9 @@ public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
             // For NDEF session, we need to connect to the tag first
             performWrite(message: message, on: tag, session: ndefSession, call: call)
         } else if tagReaderSession != nil {
-            // For Tag session, tag is already connected
+            // For Tag session, tag remains connected from discovery
+            // Note: If the tag is removed and re-presented, the session will detect it as a new tag
+            // and performWriteToTag may fail. Users should keep the tag in place after detection.
             performWriteToTag(message: message, on: tag, call: call)
         } else {
             call.reject("No active NFC session.")
@@ -461,9 +463,9 @@ extension NfcPlugin: NFCTagReaderSessionDelegate {
         currentTag = nil
         let nfcError = error as NSError
         
-        // Don't emit state change for normal session completion
-        if nfcError.code != NFCReaderError.readerSessionInvalidationErrorFirstNDEFTagRead.rawValue &&
-           nfcError.code != NFCReaderError.readerSessionInvalidationErrorUserCanceled.rawValue {
+        // Don't emit state change for normal session completion (user canceled or successful read)
+        if nfcError.code != NFCReaderError.readerSessionInvalidationErrorUserCanceled.rawValue &&
+           nfcError.code != NFCReaderError.readerSessionInvalidationErrorSessionTimeout.rawValue {
             DispatchQueue.main.async {
                 let payload: [String: Any] = [
                     "status": NFCNDEFReaderSession.readingAvailable ? "NFC_OK" : "NO_NFC",

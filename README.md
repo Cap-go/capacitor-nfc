@@ -97,8 +97,8 @@ const listener = await CapacitorNfc.addListener('nfcEvent', (event) => {
   
   // Read the UID (identifier) - works for both NDEF and raw tags
   if (event.tag?.id) {
-    const uid = event.tag.id.map(byte => byte.toString(16).padStart(2, '0')).join(':');
-    console.info('Tag UID:', uid);
+    const uid = event.tag.id.map(byte => byte.toString(16).padStart(2, '0').toUpperCase()).join(':');
+    console.info('Tag UID:', uid); // e.g., "04:A1:B2:C3:D4:E5:F6"
   }
   
   // If the tag has NDEF data, it will also be available
