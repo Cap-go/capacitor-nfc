@@ -44,6 +44,8 @@ Remember to add the required platform configuration:
 
 ## Usage
 
+### Reading NDEF tags (default behavior)
+
 ```ts
 import { CapacitorNfc } from '@capgo/capacitor-nfc';
 
@@ -73,6 +75,36 @@ await CapacitorNfc.write({
       payload,
     },
   ],
+});
+
+await listener.remove();
+await CapacitorNfc.stopScanning();
+```
+
+### Reading raw tags (iOS) - Get UID from unformatted tags
+
+```ts
+import { CapacitorNfc } from '@capgo/capacitor-nfc';
+
+// Use 'tag' session type to read raw (non-NDEF) tags
+await CapacitorNfc.startScanning({
+  iosSessionType: 'tag', // Enable raw tag reading on iOS
+  alertMessage: 'Hold your card near the device',
+});
+
+const listener = await CapacitorNfc.addListener('nfcEvent', (event) => {
+  console.info('Tag detected:', event.type); // 'tag' or 'ndef'
+  
+  // Read the UID (identifier) - works for both NDEF and raw tags
+  if (event.tag?.id) {
+    const uid = event.tag.id.map(byte => byte.toString(16).padStart(2, '0')).join(':');
+    console.info('Tag UID:', uid);
+  }
+  
+  // If the tag has NDEF data, it will also be available
+  if (event.tag?.ndefMessage) {
+    console.info('NDEF records:', event.tag.ndefMessage);
+  }
 });
 
 await listener.remove();

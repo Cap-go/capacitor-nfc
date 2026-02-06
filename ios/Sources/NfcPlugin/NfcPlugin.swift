@@ -545,26 +545,42 @@ extension NfcPlugin: NFCTagReaderSessionDelegate {
     }
 
     private func handleMiFareTag(_ mifareTag: NFCMiFareTag, session: NFCTagReaderSession) {
+        readNDEFFromTag(mifareTag, session: session)
+    }
+
+    private func handleISO7816Tag(_ iso7816Tag: NFCISO7816Tag, session: NFCTagReaderSession) {
+        readNDEFFromTag(iso7816Tag, session: session)
+    }
+
+    private func handleISO15693Tag(_ iso15693Tag: NFCISO15693Tag, session: NFCTagReaderSession) {
+        readNDEFFromTag(iso15693Tag, session: session)
+    }
+
+    private func handleFeliCaTag(_ feliCaTag: NFCFeliCaTag, session: NFCTagReaderSession) {
+        readNDEFFromTag(feliCaTag, session: session)
+    }
+
+    private func readNDEFFromTag(_ ndefTag: NFCNDEFTag, session: NFCTagReaderSession) {
         // Try to read NDEF if available
-        mifareTag.queryNDEFStatus { [weak self] status, capacity, error in
+        ndefTag.queryNDEFStatus { [weak self] status, capacity, error in
             guard let self else {
                 return
             }
 
             if error == nil && status != .notSupported {
                 // Tag supports NDEF, try to read it
-                mifareTag.readNDEF { [weak self] message, readError in
+                ndefTag.readNDEF { [weak self] message, readError in
                     guard let self else {
                         return
                     }
 
                     if let readError {
                         // NDEF read failed, still emit tag with UID
-                        self.emitTagEvent(ndefTag: mifareTag, message: nil, session: session)
+                        self.emitTagEvent(ndefTag: ndefTag, message: nil, session: session)
                     } else {
                         // Successfully read NDEF
-                        self.currentTag = mifareTag
-                        let event = self.buildEvent(tag: mifareTag, status: status, capacity: capacity, message: message)
+                        self.currentTag = ndefTag
+                        let event = self.buildEvent(tag: ndefTag, status: status, capacity: capacity, message: message)
                         self.notify(event: event)
                         if self.invalidateAfterFirstRead {
                             session.invalidate()
@@ -573,103 +589,7 @@ extension NfcPlugin: NFCTagReaderSessionDelegate {
                 }
             } else {
                 // Tag doesn't support NDEF or query failed - just emit UID
-                self.emitTagEvent(ndefTag: mifareTag, message: nil, session: session)
-            }
-        }
-    }
-
-    private func handleISO7816Tag(_ iso7816Tag: NFCISO7816Tag, session: NFCTagReaderSession) {
-        // Try to read NDEF if available
-        iso7816Tag.queryNDEFStatus { [weak self] status, capacity, error in
-            guard let self else {
-                return
-            }
-
-            if error == nil && status != .notSupported {
-                // Tag supports NDEF
-                iso7816Tag.readNDEF { [weak self] message, readError in
-                    guard let self else {
-                        return
-                    }
-
-                    if let readError {
-                        self.emitTagEvent(ndefTag: iso7816Tag, message: nil, session: session)
-                    } else {
-                        self.currentTag = iso7816Tag
-                        let event = self.buildEvent(tag: iso7816Tag, status: status, capacity: capacity, message: message)
-                        self.notify(event: event)
-                        if self.invalidateAfterFirstRead {
-                            session.invalidate()
-                        }
-                    }
-                }
-            } else {
-                // Tag doesn't support NDEF - just emit UID
-                self.emitTagEvent(ndefTag: iso7816Tag, message: nil, session: session)
-            }
-        }
-    }
-
-    private func handleISO15693Tag(_ iso15693Tag: NFCISO15693Tag, session: NFCTagReaderSession) {
-        // Try to read NDEF if available
-        iso15693Tag.queryNDEFStatus { [weak self] status, capacity, error in
-            guard let self else {
-                return
-            }
-
-            if error == nil && status != .notSupported {
-                // Tag supports NDEF
-                iso15693Tag.readNDEF { [weak self] message, readError in
-                    guard let self else {
-                        return
-                    }
-
-                    if let readError {
-                        self.emitTagEvent(ndefTag: iso15693Tag, message: nil, session: session)
-                    } else {
-                        self.currentTag = iso15693Tag
-                        let event = self.buildEvent(tag: iso15693Tag, status: status, capacity: capacity, message: message)
-                        self.notify(event: event)
-                        if self.invalidateAfterFirstRead {
-                            session.invalidate()
-                        }
-                    }
-                }
-            } else {
-                // Tag doesn't support NDEF - just emit UID
-                self.emitTagEvent(ndefTag: iso15693Tag, message: nil, session: session)
-            }
-        }
-    }
-
-    private func handleFeliCaTag(_ feliCaTag: NFCFeliCaTag, session: NFCTagReaderSession) {
-        // Try to read NDEF if available
-        feliCaTag.queryNDEFStatus { [weak self] status, capacity, error in
-            guard let self else {
-                return
-            }
-
-            if error == nil && status != .notSupported {
-                // Tag supports NDEF
-                feliCaTag.readNDEF { [weak self] message, readError in
-                    guard let self else {
-                        return
-                    }
-
-                    if let readError {
-                        self.emitTagEvent(ndefTag: feliCaTag, message: nil, session: session)
-                    } else {
-                        self.currentTag = feliCaTag
-                        let event = self.buildEvent(tag: feliCaTag, status: status, capacity: capacity, message: message)
-                        self.notify(event: event)
-                        if self.invalidateAfterFirstRead {
-                            session.invalidate()
-                        }
-                    }
-                }
-            } else {
-                // Tag doesn't support NDEF - just emit UID
-                self.emitTagEvent(ndefTag: feliCaTag, message: nil, session: session)
+                self.emitTagEvent(ndefTag: ndefTag, message: nil, session: session)
             }
         }
     }
