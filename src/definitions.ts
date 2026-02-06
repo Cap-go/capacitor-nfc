@@ -104,6 +104,14 @@ export interface StartScanningOptions {
    */
   alertMessage?: string;
   /**
+   * iOS-only: session type to use for NFC scanning.
+   * - `'ndef'`: Uses NFCNDEFReaderSession (default). Only detects NDEF-formatted tags.
+   * - `'tag'`: Uses NFCTagReaderSession. Detects both NDEF and non-NDEF tags (e.g., raw MIFARE tags).
+   *            Allows reading UID from unformatted tags.
+   * Defaults to `'ndef'` for backward compatibility.
+   */
+  iosSessionType?: 'ndef' | 'tag';
+  /**
    * Android-only: raw flags passed to `NfcAdapter.enableReaderMode`.
    * Defaults to enabling all tag types with skipping NDEF checks.
    */

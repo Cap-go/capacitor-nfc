@@ -290,11 +290,12 @@ addListener(eventName: 'nfcStateChange', listenerFunc: (event: NfcStateChangeEve
 
 Options controlling the behaviour of {@link CapacitorNfcPlugin.startScanning}.
 
-| Prop                           | Type                 | Description                                                                                                                    |
-| ------------------------------ | -------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| **`invalidateAfterFirstRead`** | <code>boolean</code> | iOS-only: closes the NFC session automatically after the first successful tag read. Defaults to `true`.                        |
-| **`alertMessage`**             | <code>string</code>  | iOS-only: custom message displayed in the NFC system sheet while scanning.                                                     |
-| **`androidReaderModeFlags`**   | <code>number</code>  | Android-only: raw flags passed to `NfcAdapter.enableReaderMode`. Defaults to enabling all tag types with skipping NDEF checks. |
+| Prop                           | Type                         | Description                                                                                                                                                                                                                                                                                                                     |
+| ------------------------------ | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`invalidateAfterFirstRead`** | <code>boolean</code>         | iOS-only: closes the NFC session automatically after the first successful tag read. Defaults to `true`.                                                                                                                                                                                                                         |
+| **`alertMessage`**             | <code>string</code>          | iOS-only: custom message displayed in the NFC system sheet while scanning.                                                                                                                                                                                                                                                      |
+| **`iosSessionType`**           | <code>'tag' \| 'ndef'</code> | iOS-only: session type to use for NFC scanning. - `'ndef'`: Uses NFCNDEFReaderSession (default). Only detects NDEF-formatted tags. - `'tag'`: Uses NFCTagReaderSession. Detects both NDEF and non-NDEF tags (e.g., raw MIFARE tags). Allows reading UID from unformatted tags. Defaults to `'ndef'` for backward compatibility. |
+| **`androidReaderModeFlags`**   | <code>number</code>          | Android-only: raw flags passed to `NfcAdapter.enableReaderMode`. Defaults to enabling all tag types with skipping NDEF checks.                                                                                                                                                                                                  |
 
 
 #### WriteTagOptions
