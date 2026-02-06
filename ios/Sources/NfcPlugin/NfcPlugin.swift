@@ -185,51 +185,16 @@ public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
                 return
             }
 
-            tag.queryNDEFStatus { status, capacity, statusError in
-                if let statusError {
-                    DispatchQueue.main.async {
-                        call.reject("Failed to query tag status.", nil, statusError)
-                    }
-                    return
-                }
-
-                switch status {
-                case .readWrite:
-                    if capacity < message.length {
-                        DispatchQueue.main.async {
-                            call.reject("Tag capacity is insufficient for the provided message.")
-                        }
-                        return
-                    }
-                    tag.writeNDEF(message) { writeError in
-                        DispatchQueue.main.async {
-                            if let writeError {
-                                call.reject("Failed to write NDEF message.", nil, writeError)
-                            } else {
-                                call.resolve()
-                            }
-                        }
-                    }
-                case .readOnly:
-                    DispatchQueue.main.async {
-                        call.reject("Tag is read only.")
-                    }
-                case .notSupported:
-                    DispatchQueue.main.async {
-                        call.reject("Tag does not support NDEF.")
-                    }
-                @unknown default:
-                    DispatchQueue.main.async {
-                        call.reject("Unknown tag status.")
-                    }
-                }
-            }
+            self.performWriteToTag(message: message, on: tag, call: call)
         }
     }
 
     private func performWriteWithTagSession(message: NFCNDEFMessage, on tag: NFCNDEFTag, session: NFCTagReaderSession, call: CAPPluginCall) {
-        // For NFCTagReaderSession, we need to connect differently
-        // The tag should already be connected from the discovery, but we ensure it
+        // Note: Tag should already be connected from the discovery phase
+        performWriteToTag(message: message, on: tag, call: call)
+    }
+
+    private func performWriteToTag(message: NFCNDEFMessage, on tag: NFCNDEFTag, call: CAPPluginCall) {
         tag.queryNDEFStatus { status, capacity, statusError in
             if let statusError {
                 DispatchQueue.main.async {
