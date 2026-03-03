@@ -29,6 +29,34 @@ public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
     private var invalidateAfterFirstRead = true
     private var sessionType: String = "ndef"
 
+    /// Parse polling options from string array to NFCTagReaderSession.PollingOption
+    /// Valid options: "iso14443", "iso15693", "iso18092"
+    /// Defaults to [.iso14443, .iso15693] if no valid options provided
+    private func parsePollingOptions(_ options: [String]) -> NFCTagReaderSession.PollingOption {
+        var pollingOptions: NFCTagReaderSession.PollingOption = []
+
+        for option in options {
+            switch option.lowercased() {
+            case "iso14443":
+                pollingOptions.insert(.iso14443)
+            case "iso15693":
+                pollingOptions.insert(.iso15693)
+            case "iso18092":
+                pollingOptions.insert(.iso18092)
+            default:
+                print("⚠️ NFC: Unknown polling option '\(option)', ignoring")
+            }
+        }
+
+        // Default to iso14443 + iso15693 if nothing valid was provided
+        if pollingOptions.isEmpty {
+            print("⚠️ NFC: No valid polling options provided, using defaults [iso14443, iso15693]")
+            pollingOptions = [.iso14443, .iso15693]
+        }
+
+        return pollingOptions
+    }
+
     @objc public func startScanning(_ call: CAPPluginCall) {
         #if targetEnvironment(simulator)
         call.reject("NFC is not available on the simulator.", "NO_NFC")
@@ -43,6 +71,12 @@ public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
         let alertMessage = call.getString("alertMessage")
         sessionType = call.getString("iosSessionType", "ndef")
 
+        // Parse iosPollingOptions array, defaulting to ["iso14443", "iso15693"]
+        // Available options: "iso14443", "iso15693", "iso18092"
+        // Note: iso18092 (FeliCa/NFC-F) requires additional entitlements
+        let iosPollingOptionsArray = call.getArray("iosPollingOptions", String.self) ?? ["iso14443", "iso15693"]
+        let pollingOptions = self.parsePollingOptions(iosPollingOptionsArray)
+
         DispatchQueue.main.async {
             // Invalidate any existing sessions
             self.ndefReaderSession?.invalidate()
@@ -52,8 +86,9 @@ public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
 
             if self.sessionType == "tag" {
                 // Use NFCTagReaderSession for raw tag support
+
                 self.tagReaderSession = NFCTagReaderSession(
-                    pollingOption: [.iso14443, .iso15693, .iso18092],
+                    pollingOption: pollingOptions,
                     delegate: self,
                     queue: self.sessionQueue
                 )
@@ -125,7 +160,7 @@ public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
             call.reject("No active NFC session or tag.")
             return
         }
-        
+
         if let ndefSession = ndefReaderSession {
             // For NDEF session, we need to connect to the tag first
             performWrite(message: message, on: tag, session: ndefSession, call: call)
@@ -395,6 +430,7 @@ public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 }
 
+// MARK: - NFCNDEFReaderSessionDelegate
 extension NfcPlugin: NFCNDEFReaderSessionDelegate {
     public func readerSession(_ session: NFCNDEFReaderSession, didInvalidateWithError error: Error) {
         currentTag = nil
@@ -475,7 +511,7 @@ extension NfcPlugin: NFCTagReaderSessionDelegate {
     public func tagReaderSession(_ session: NFCTagReaderSession, didInvalidateWithError error: Error) {
         currentTag = nil
         let nfcError = error as NSError
-        
+
         // Don't emit state change for normal session completion (user canceled)
         // Also check for successful read completion
         if nfcError.code != NFCReaderError.readerSessionInvalidationErrorUserCanceled.rawValue {
@@ -496,7 +532,7 @@ extension NfcPlugin: NFCTagReaderSessionDelegate {
             session.invalidate(errorMessage: "More than one tag detected. Please present only one tag.")
             return
         }
-        
+
         guard let firstTag = tags.first else {
             return
         }
@@ -518,12 +554,84 @@ extension NfcPlugin: NFCTagReaderSessionDelegate {
             case .iso7816(let iso7816Tag):
                 self.processTag(iso7816Tag, session: session)
             case .iso15693(let iso15693Tag):
-                self.processTag(iso15693Tag, session: session)
+                self.processISO15693Tag(iso15693Tag, session: session)
             case .feliCa(let feliCaTag):
                 self.processTag(feliCaTag, session: session)
             @unknown default:
                 session.invalidate(errorMessage: "Unsupported tag type")
             }
+        }
+    }
+
+    /// Process ISO 15693 tags - these tags may not support NDEF, so we emit tag info with UID
+    private func processISO15693Tag(_ tag: NFCISO15693Tag, session: NFCTagReaderSession) {
+        // First try to query NDEF status - some ISO15693 tags support NDEF
+        tag.queryNDEFStatus { [weak self] status, capacity, error in
+            guard let self else { return }
+
+            if error != nil {
+                // Tag doesn't support NDEF, emit tag info with UID
+                self.emitISO15693TagEvent(tag: tag, status: .notSupported, capacity: 0, message: nil, session: session)
+                return
+            }
+
+            if status == .notSupported {
+                self.emitISO15693TagEvent(tag: tag, status: status, capacity: capacity, message: nil, session: session)
+                return
+            }
+
+            // Try to read NDEF
+            tag.readNDEF { [weak self] message, readError in
+                guard let self else { return }
+
+                if readError != nil {
+                    // Failed to read NDEF, still emit tag with UID
+                    self.emitISO15693TagEvent(tag: tag, status: status, capacity: capacity, message: nil, session: session)
+                    return
+                }
+
+                self.emitISO15693TagEvent(tag: tag, status: status, capacity: capacity, message: message, session: session)
+            }
+        }
+    }
+
+    /// Emit event for ISO 15693 tag
+    private func emitISO15693TagEvent(tag: NFCISO15693Tag, status: NFCNDEFStatus, capacity: Int, message: NFCNDEFMessage?, session: NFCTagReaderSession) {
+        // Save the current tag for subsequent write operations
+        currentTag = tag
+
+        var tagInfo: [String: Any] = [:]
+
+        // Add the tag ID (UID)
+        tagInfo["id"] = array(from: tag.identifier)
+        tagInfo["techTypes"] = ["NFCISO15693Tag"]
+        tagInfo["type"] = "ISO 15693"
+        tagInfo["icManufacturerCode"] = tag.icManufacturerCode
+        tagInfo["icSerialNumber"] = array(from: tag.icSerialNumber)
+        tagInfo["isWritable"] = status == .readWrite
+        tagInfo["maxSize"] = capacity
+
+        if let message {
+            tagInfo["ndefMessage"] = message.records.map { record in
+                [
+                    "tnf": NSNumber(value: record.typeNameFormat.rawValue),
+                    "type": array(from: record.type),
+                    "id": array(from: record.identifier),
+                    "payload": array(from: record.payload)
+                ].compactMapValues { $0 }
+            }
+        }
+
+        let event: [String: Any] = [
+            "type": message != nil ? "ndef" : "tag",
+            "tag": tagInfo
+        ]
+
+        notify(event: event)
+
+        if invalidateAfterFirstRead {
+            session.alertMessage = "Tag read successfully"
+            session.invalidate()
         }
     }
 
@@ -545,7 +653,7 @@ extension NfcPlugin: NFCTagReaderSessionDelegate {
                     // readNDEF may return nil message without an error, or return an error.
                     // We should emit the tag with its UID and writability info.
                     if message == nil {
-                        // Blank tag or NDEF read failed - emit tag with UID and status info
+                        // NDEF read failed, still emit tag with UID
                         self.emitTagEvent(tag: tag, status: status, capacity: capacity, message: nil, session: session)
                     } else {
                         // Successfully read NDEF
@@ -553,6 +661,7 @@ extension NfcPlugin: NFCTagReaderSessionDelegate {
                         let event = self.buildEvent(tag: tag, status: status, capacity: capacity, message: message)
                         self.notify(event: event)
                         if self.invalidateAfterFirstRead {
+                            session.alertMessage = "Tag read successfully"
                             session.invalidate()
                         }
                     }
@@ -569,7 +678,7 @@ extension NfcPlugin: NFCTagReaderSessionDelegate {
         currentTag = tag
 
         var tagInfo: [String: Any] = [:]
-        
+
         // Extract and add the tag ID (UID)
         if let identifierData = extractIdentifier(from: tag) {
             tagInfo["id"] = array(from: identifierData)
@@ -599,10 +708,11 @@ extension NfcPlugin: NFCTagReaderSessionDelegate {
             "type": message != nil ? "ndef" : "tag",
             "tag": tagInfo
         ]
-        
+
         notify(event: event)
-        
+
         if invalidateAfterFirstRead {
+            session.alertMessage = "Tag read successfully"
             session.invalidate()
         }
     }

@@ -19,6 +19,12 @@ export type NfcStatus = 'NFC_OK' | 'NO_NFC' | 'NFC_DISABLED' | 'NDEF_PUSH_DISABL
 export type NfcEventType = 'tag' | 'ndef' | 'ndef-mime' | 'ndef-formatable';
 
 /**
+ * iOS NFC polling option types
+ * These correspond to NFCTagReaderSession.PollingOption in CoreNFC
+ */
+export type IosPollingOption = 'iso14443' | 'iso15693' | 'iso18092';
+
+/**
  * JSON structure representing a single NDEF record.
  *
  * Mirrors the data format returned by the legacy Cordova implementation and
@@ -116,6 +122,30 @@ export interface StartScanningOptions {
    * Defaults to enabling all tag types with skipping NDEF checks.
    */
   androidReaderModeFlags?: number;
+  /**
+   * iOS-only: Array of polling options to use when scanning for NFC tags.
+   *
+   * Available options:
+   * - `'iso14443'`: NFC-A and NFC-B protocols (MIFARE, ISO-DEP, etc.)
+   * - `'iso15693'`: NFC-V protocol (vicinity cards)
+   * - `'iso18092'`: NFC-F protocol (FeliCa) - may require additional entitlements
+   *
+   * Defaults to `['iso14443', 'iso15693']` if not specified.
+   *
+   * Note: `iso18092` (FeliCa) may require specific app entitlements and could
+   * cause issues if those entitlements are not configured. Use with caution.
+   *
+   * @example
+   * // Default scanning (most compatible)
+   * await startScanning({ iosPollingOptions: ['iso14443', 'iso15693'] });
+   *
+   * // Include FeliCa support (requires entitlements)
+   * await startScanning({ iosPollingOptions: ['iso14443', 'iso15693', 'iso18092'] });
+   *
+   * // Only scan for ISO 15693 tags
+   * await startScanning({ iosPollingOptions: ['iso15693'] });
+   */
+  iosPollingOptions?: IosPollingOption[];
 }
 
 /**
