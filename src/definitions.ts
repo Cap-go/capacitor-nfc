@@ -108,6 +108,9 @@ export interface StartScanningOptions {
    * - `'ndef'`: Uses NFCNDEFReaderSession (default). Only detects NDEF-formatted tags.
    * - `'tag'`: Uses NFCTagReaderSession. Detects both NDEF and non-NDEF tags (e.g., raw MIFARE tags).
    *            Allows reading UID from unformatted tags.
+   *            **Requires** the `Near Field Communication Tag Reader Session Formats` entitlement
+   *            in your app with the `TAG` format included. Without it the session will fail to
+   *            start and the promise will reject with a `NO_NFC` error code.
    * Defaults to `'ndef'` for backward compatibility.
    */
   iosSessionType?: 'ndef' | 'tag';

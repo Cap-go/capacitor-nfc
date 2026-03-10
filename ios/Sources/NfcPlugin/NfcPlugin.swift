@@ -57,6 +57,13 @@ public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
                     delegate: self,
                     queue: self.sessionQueue
                 )
+                guard self.tagReaderSession != nil else {
+                    call.reject(
+                        "Failed to create NFC tag reader session. Make sure the 'Near Field Communication Tag Reader Session Formats' entitlement includes the 'TAG' format in your app target.",
+                        "NO_NFC"
+                    )
+                    return
+                }
                 if let alertMessage, !alertMessage.isEmpty {
                     self.tagReaderSession?.alertMessage = alertMessage
                 }
@@ -73,9 +80,9 @@ public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
                 }
                 self.ndefReaderSession?.begin()
             }
-        }
 
-        call.resolve()
+            call.resolve()
+        }
         #endif
     }
 
