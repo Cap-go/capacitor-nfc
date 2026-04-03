@@ -65,7 +65,7 @@ public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
         call.reject("NFC is not available on the simulator.", "NO_NFC")
         return
         #else
-        let requestedSessionType = call.getString("iosSessionType", "ndef")?.lowercased() ?? "ndef"
+        let requestedSessionType = call.getString("iosSessionType", "ndef").lowercased()
         sessionType = requestedSessionType == "tag" ? "tag" : "ndef"
 
         guard isSessionAvailable(for: sessionType) else {
