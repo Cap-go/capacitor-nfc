@@ -64,6 +64,7 @@ public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
             session.alertMessage = alertMessage
         }
 
+        tagReaderSession = session
         session.begin()
         return session
     }
@@ -113,6 +114,8 @@ public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
                     )
                     return
                 }
+
+                return
             } else {
                 // Use NFCNDEFReaderSession (default behavior)
                 self.ndefReaderSession = NFCNDEFReaderSession(
@@ -177,7 +180,7 @@ public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
             call.reject("No active NFC session or tag.")
             return
         }
-        
+
         if let ndefSession = ndefReaderSession {
             // For NDEF session, we need to connect to the tag first
             performWrite(message: message, on: tag, session: ndefSession, call: call)
@@ -575,7 +578,7 @@ extension NfcPlugin: NFCTagReaderSessionDelegate {
             tagReaderSession = nil
             return
         }
-        
+
         // Don't emit state change for normal session completion (user canceled)
         // Also check for successful read completion
         if nfcError.code != NFCReaderError.readerSessionInvalidationErrorUserCanceled.rawValue {
@@ -596,7 +599,7 @@ extension NfcPlugin: NFCTagReaderSessionDelegate {
             session.invalidate(errorMessage: "More than one tag detected. Please present only one tag.")
             return
         }
-        
+
         guard let firstTag = tags.first else {
             return
         }
@@ -636,7 +639,7 @@ extension NfcPlugin: NFCTagReaderSessionDelegate {
 
             if error == nil && status != .notSupported {
                 // Tag supports NDEF, try to read it
-                tag.readNDEF { [weak self] message, readError in
+                tag.readNDEF { [weak self] message, _ in
                     guard let self else {
                         return
                     }
@@ -669,15 +672,15 @@ extension NfcPlugin: NFCTagReaderSessionDelegate {
         currentTag = tag
 
         var tagInfo: [String: Any] = [:]
-        
+
         // Extract and add the tag ID (UID)
         if let identifierData = extractIdentifier(from: tag) {
             tagInfo["id"] = array(from: identifierData)
         }
-        
+
         tagInfo["techTypes"] = detectTechTypes(for: tag)
         tagInfo["type"] = translateType(for: tag)
-        
+
         // Include writability and capacity information
         if status != .notSupported {
             tagInfo["isWritable"] = status == .readWrite
@@ -699,9 +702,9 @@ extension NfcPlugin: NFCTagReaderSessionDelegate {
             "type": message != nil ? "ndef" : "tag",
             "tag": tagInfo
         ]
-        
+
         notify(event: event)
-        
+
         if invalidateAfterFirstRead {
             session.invalidate()
         }
