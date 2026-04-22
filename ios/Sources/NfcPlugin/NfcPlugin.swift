@@ -28,6 +28,11 @@ public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
     private var currentTag: NFCNDEFTag?
     private var invalidateAfterFirstRead = true
     private var sessionType: String = "ndef"
+    private var pendingStartCall: CAPPluginCall?
+    private var pendingAlertMessage: String?
+    private var tagSessionActivated = false
+    private var tagSessionTriedFallback = false
+    private var tagSessionPollingOptions: NFCTagReaderSession.PollingOption = []
 
     private func isSessionAvailable(for type: String) -> Bool {
         if type == "tag" {
@@ -44,6 +49,9 @@ public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
         pollingOptions: NFCTagReaderSession.PollingOption,
         alertMessage: String?
     ) -> NFCTagReaderSession? {
+        tagSessionActivated = false
+        tagSessionPollingOptions = pollingOptions
+
         guard let session = NFCTagReaderSession(
             pollingOption: pollingOptions,
             delegate: self,
@@ -69,7 +77,10 @@ public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
         sessionType = requestedSessionType == "tag" ? "tag" : "ndef"
 
         guard isSessionAvailable(for: sessionType) else {
-            call.reject("NFC is not available on this device.", "NO_NFC")
+            let message = sessionType == "tag"
+                ? "NFC tag reading is not available on this device. Ensure the TAG reader entitlement is enabled."
+                : "NFC is not available on this device."
+            call.reject(message, "NO_NFC")
             return
         }
 
@@ -85,20 +96,17 @@ public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
 
             if self.sessionType == "tag" {
                 // Use NFCTagReaderSession for raw tag support
-                self.tagReaderSession = self.makeTagReaderSession(
+                self.pendingStartCall = call
+                self.pendingAlertMessage = alertMessage
+                self.tagSessionTriedFallback = false
+
+                let session = self.makeTagReaderSession(
                     pollingOptions: [.iso14443, .iso15693, .iso18092],
                     alertMessage: alertMessage
                 )
 
-                // Some configurations block FeliCa polling; retry without iso18092 to keep common formats working.
-                if self.tagReaderSession == nil {
-                    self.tagReaderSession = self.makeTagReaderSession(
-                        pollingOptions: [.iso14443, .iso15693],
-                        alertMessage: alertMessage
-                    )
-                }
-
-                guard self.tagReaderSession != nil else {
+                guard session != nil else {
+                    self.pendingStartCall = nil
                     call.reject(
                         "Failed to create NFC tag reader session. Make sure the 'Near Field Communication Tag Reader Session Formats' entitlement includes the 'TAG' format in your app target.",
                         "NO_NFC"
@@ -513,12 +521,60 @@ extension NfcPlugin: NFCNDEFReaderSessionDelegate {
 // MARK: - NFCTagReaderSessionDelegate
 extension NfcPlugin: NFCTagReaderSessionDelegate {
     public func tagReaderSessionDidBecomeActive(_ session: NFCTagReaderSession) {
-        // Session became active, ready to detect tags
+        tagSessionActivated = true
+
+        if let pendingCall = pendingStartCall {
+            pendingStartCall = nil
+            DispatchQueue.main.async {
+                pendingCall.resolve()
+            }
+        }
     }
 
     public func tagReaderSession(_ session: NFCTagReaderSession, didInvalidateWithError error: Error) {
         currentTag = nil
         let nfcError = error as NSError
+
+        if let pendingCall = pendingStartCall {
+            let canRetryWithoutFeliCa = !tagSessionActivated &&
+                tagSessionPollingOptions.contains(.iso18092) &&
+                !tagSessionTriedFallback &&
+                (nfcError.code == NFCReaderError.readerErrorUnsupportedFeature.rawValue ||
+                    nfcError.code == NFCReaderError.readerErrorSecurityViolation.rawValue)
+
+            if canRetryWithoutFeliCa {
+                tagSessionTriedFallback = true
+                tagReaderSession = nil
+
+                DispatchQueue.main.async {
+                    let fallbackSession = self.makeTagReaderSession(
+                        pollingOptions: [.iso14443, .iso15693],
+                        alertMessage: self.pendingAlertMessage
+                    )
+
+                    if fallbackSession == nil {
+                        self.pendingStartCall = nil
+                        pendingCall.reject(
+                            "Failed to start NFC tag session without FeliCa polling: \(error.localizedDescription)",
+                            "NO_NFC",
+                            error
+                        )
+                    }
+                }
+                return
+            }
+
+            pendingStartCall = nil
+            DispatchQueue.main.async {
+                pendingCall.reject(
+                    "Failed to start NFC tag session: \(error.localizedDescription)",
+                    "NO_NFC",
+                    error
+                )
+            }
+            tagReaderSession = nil
+            return
+        }
         
         // Don't emit state change for normal session completion (user canceled)
         // Also check for successful read completion
