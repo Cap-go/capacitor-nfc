@@ -95,12 +95,19 @@ public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
             self.ndefReaderSession = nil
             self.tagReaderSession?.invalidate()
             self.tagReaderSession = nil
+            self.currentTag = nil
+            if let pendingStartCall = self.pendingStartCall, pendingStartCall !== call {
+                pendingStartCall.reject("NFC scan was superseded by a new startScanning call.", "CANCELLED")
+            }
+            self.pendingStartCall = nil
+            self.pendingStartSession = nil
+            self.pendingAlertMessage = nil
+            self.tagSessionTriedFallback = false
 
             if self.sessionType == "tag" {
                 // Use NFCTagReaderSession for raw tag support
                 self.pendingStartCall = call
                 self.pendingAlertMessage = alertMessage
-                self.tagSessionTriedFallback = false
 
                 let session = self.makeTagReaderSession(
                     pollingOptions: [.iso14443, .iso15693, .iso18092],
@@ -560,14 +567,19 @@ extension NfcPlugin: NFCTagReaderSessionDelegate {
                     nfcError.code == NFCReaderError.readerErrorSecurityViolation.rawValue)
 
             if canRetryWithoutFeliCa {
+                let fallbackAlertMessage = pendingAlertMessage
                 tagSessionTriedFallback = true
                 tagReaderSession = nil
                 pendingStartSession = nil
 
                 DispatchQueue.main.async {
+                    guard self.pendingStartCall === pendingCall, self.pendingStartSession == nil else {
+                        return
+                    }
+
                     let fallbackSession = self.makeTagReaderSession(
                         pollingOptions: [.iso14443, .iso15693],
-                        alertMessage: self.pendingAlertMessage
+                        alertMessage: fallbackAlertMessage
                     )
                     self.pendingStartSession = fallbackSession
 
