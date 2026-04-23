@@ -29,6 +29,7 @@ public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
     private var invalidateAfterFirstRead = true
     private var sessionType: String = "ndef"
     private var pendingStartCall: CAPPluginCall?
+    private var pendingStartSession: NFCTagReaderSession?
     private var pendingAlertMessage: String?
     private var tagSessionActivated = false
     private var tagSessionTriedFallback = false
@@ -105,9 +106,11 @@ public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
                     pollingOptions: [.iso14443, .iso15693, .iso18092],
                     alertMessage: alertMessage
                 )
+                self.pendingStartSession = session
 
                 guard session != nil else {
                     self.pendingStartCall = nil
+                    self.pendingStartSession = nil
                     call.reject(
                         "Failed to create NFC tag reader session. Make sure the 'Near Field Communication Tag Reader Session Formats' entitlement includes the 'TAG' format in your app target.",
                         "NO_NFC"
@@ -524,10 +527,16 @@ extension NfcPlugin: NFCNDEFReaderSessionDelegate {
 // MARK: - NFCTagReaderSessionDelegate
 extension NfcPlugin: NFCTagReaderSessionDelegate {
     public func tagReaderSessionDidBecomeActive(_ session: NFCTagReaderSession) {
+        guard session === tagReaderSession else {
+            return
+        }
+
         tagSessionActivated = true
 
-        if let pendingCall = pendingStartCall {
+        if session === pendingStartSession, let pendingCall = pendingStartCall {
             pendingStartCall = nil
+            pendingStartSession = nil
+            pendingAlertMessage = nil
             DispatchQueue.main.async {
                 pendingCall.resolve()
             }
@@ -535,10 +544,15 @@ extension NfcPlugin: NFCTagReaderSessionDelegate {
     }
 
     public func tagReaderSession(_ session: NFCTagReaderSession, didInvalidateWithError error: Error) {
-        currentTag = nil
         let nfcError = error as NSError
 
         if let pendingCall = pendingStartCall {
+            guard session === pendingStartSession else {
+                return
+            }
+
+            currentTag = nil
+
             let canRetryWithoutFeliCa = !tagSessionActivated &&
                 tagSessionPollingOptions.contains(.iso18092) &&
                 !tagSessionTriedFallback &&
@@ -548,15 +562,19 @@ extension NfcPlugin: NFCTagReaderSessionDelegate {
             if canRetryWithoutFeliCa {
                 tagSessionTriedFallback = true
                 tagReaderSession = nil
+                pendingStartSession = nil
 
                 DispatchQueue.main.async {
                     let fallbackSession = self.makeTagReaderSession(
                         pollingOptions: [.iso14443, .iso15693],
                         alertMessage: self.pendingAlertMessage
                     )
+                    self.pendingStartSession = fallbackSession
 
                     if fallbackSession == nil {
                         self.pendingStartCall = nil
+                        self.pendingStartSession = nil
+                        self.pendingAlertMessage = nil
                         pendingCall.reject(
                             "Failed to start NFC tag session without FeliCa polling: \(error.localizedDescription)",
                             "NO_NFC",
@@ -568,6 +586,8 @@ extension NfcPlugin: NFCTagReaderSessionDelegate {
             }
 
             pendingStartCall = nil
+            pendingStartSession = nil
+            pendingAlertMessage = nil
             DispatchQueue.main.async {
                 pendingCall.reject(
                     "Failed to start NFC tag session: \(error.localizedDescription)",
@@ -578,6 +598,12 @@ extension NfcPlugin: NFCTagReaderSessionDelegate {
             tagReaderSession = nil
             return
         }
+
+        guard session === tagReaderSession else {
+            return
+        }
+
+        currentTag = nil
 
         // Don't emit state change for normal session completion (user canceled)
         // Also check for successful read completion
