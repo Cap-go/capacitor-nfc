@@ -111,6 +111,13 @@ public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
         invalidateAfterFirstRead = call.getBool("invalidateAfterFirstRead", true)
         let alertMessage = call.getString("alertMessage")
 
+        let requestedPollingOptions = call.getArray("iosPollingOptions", ["iso14443", "iso15693", "iso18092"])
+        let pollingOptions = self.pollingOptions(requestedPollingOptions)
+        guard sessionType != "tag" || !pollingOptions.isEmpty else {
+            call.reject("No valid polling options provided")
+            return
+        }
+
         DispatchQueue.main.async {
             // Invalidate any existing sessions
             self.ndefReaderSession?.invalidate()
@@ -130,9 +137,6 @@ public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
                 // Use NFCTagReaderSession for raw tag support
                 self.pendingStartCall = call
                 self.pendingAlertMessage = alertMessage
-
-                let requestedPollingOptions = call.getArray("iosPollingOptions", ["iso14443", "iso15693", "iso18092"])
-                let pollingOptions = self.pollingOptions(requestedPollingOptions)
 
                 let session = self.makeTagReaderSession(
                     pollingOptions: pollingOptions,
