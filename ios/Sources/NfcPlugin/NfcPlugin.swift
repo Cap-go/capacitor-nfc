@@ -53,13 +53,13 @@ public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
                 continue
             }
 
-            if (string == "iso14443") {
+            if string == "iso14443" {
                 pollingOptions.insert(.iso14443)
-            } else if (string == "iso15693") {
+            } else if string == "iso15693" {
                 pollingOptions.insert(.iso15693)
-            } else if (string == "iso18092") {
+            } else if string == "iso18092" {
                 pollingOptions.insert(.iso18092)
-            } else if (string == "pace") {
+            } else if string == "pace" {
                 if #available(iOS 16.0, *) {
                     pollingOptions.insert(.pace)
                 }
