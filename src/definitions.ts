@@ -19,6 +19,18 @@ export type NfcStatus = 'NFC_OK' | 'NO_NFC' | 'NFC_DISABLED' | 'NDEF_PUSH_DISABL
 export type NfcEventType = 'tag' | 'ndef' | 'ndef-mime' | 'ndef-formatable';
 
 /**
+ * iOS-specific polling options for NFC scanning sessions.
+ * These options determine the type of tags that a reader session
+ * should detect during a polling sequence.
+ * 
+ * - 'iso14443'': Polls for ISO 14443 tags
+ * - 'iso15693': Polls for ISO 15693 tags
+ * - 'iso18092': Polls for ISO 18092 tags
+ * - 'pace': Polls for PACE tags (available on iOS 16 and later)
+ */
+export type NfcIosPollingOption = 'iso14443' | 'iso15693' | 'iso18092' | 'pace';
+
+/**
  * JSON structure representing a single NDEF record.
  *
  * Mirrors the data format returned by the legacy Cordova implementation and
@@ -114,6 +126,11 @@ export interface StartScanningOptions {
    * Defaults to `'ndef'` for backward compatibility.
    */
   iosSessionType?: 'ndef' | 'tag';
+  /**
+   * iOS-only: polling options to use for NFC scanning.
+   * Defaults to `['iso14443', 'iso15693', 'iso18092']` for backward compatibility.
+   */
+  iosPollingOptions?: NfcIosPollingOption[];
   /**
    * Android-only: raw flags passed to `NfcAdapter.enableReaderMode`.
    * Defaults to enabling all tag types with skipping NDEF checks.
