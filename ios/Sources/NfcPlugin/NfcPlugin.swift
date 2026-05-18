@@ -131,7 +131,7 @@ public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
                 self.pendingStartCall = call
                 self.pendingAlertMessage = alertMessage
 
-                let requestedPollingOptions = call.getArray("iosPollingOptions", ["iso1443", "iso15693", "iso18092"])
+                let requestedPollingOptions = call.getArray("iosPollingOptions", ["iso14443", "iso15693", "iso18092"])
                 let pollingOptions = self.pollingOptions(requestedPollingOptions)
 
                 let session = self.makeTagReaderSession(
