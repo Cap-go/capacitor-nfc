@@ -464,7 +464,7 @@ iOS-specific polling options for NFC scanning sessions.
 These options determine the type of tags that a reader session
 should detect during a polling sequence.
 
-- 'iso14443'': Polls for ISO 14443 tags
+- 'iso14443': Polls for ISO 14443 tags
 - 'iso15693': Polls for ISO 15693 tags
 - 'iso18092': Polls for ISO 18092 tags
 - 'pace': Polls for PACE tags (available on iOS 16 and later)
