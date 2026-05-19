@@ -46,6 +46,28 @@ public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
         NFCTagReaderSession.readingAvailable || NFCNDEFReaderSession.readingAvailable
     }
 
+    private func pollingOptions(_ requestedPollingOptions: JSArray) -> NFCTagReaderSession.PollingOption {
+        var pollingOptions: NFCTagReaderSession.PollingOption = []
+        for option in requestedPollingOptions {
+            guard let string = option as? String else {
+                continue
+            }
+
+            if string == "iso14443" {
+                pollingOptions.insert(.iso14443)
+            } else if string == "iso15693" {
+                pollingOptions.insert(.iso15693)
+            } else if string == "iso18092" {
+                pollingOptions.insert(.iso18092)
+            } else if string == "pace" {
+                if #available(iOS 16.0, *) {
+                    pollingOptions.insert(.pace)
+                }
+            }
+        }
+        return pollingOptions
+    }
+
     private func makeTagReaderSession(
         pollingOptions: NFCTagReaderSession.PollingOption,
         alertMessage: String?
@@ -89,6 +111,13 @@ public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
         invalidateAfterFirstRead = call.getBool("invalidateAfterFirstRead", true)
         let alertMessage = call.getString("alertMessage")
 
+        let requestedPollingOptions = call.getArray("iosPollingOptions", ["iso14443", "iso15693", "iso18092"])
+        let pollingOptions = self.pollingOptions(requestedPollingOptions)
+        guard sessionType != "tag" || !pollingOptions.isEmpty else {
+            call.reject("No valid polling options provided")
+            return
+        }
+
         DispatchQueue.main.async {
             // Invalidate any existing sessions
             self.ndefReaderSession?.invalidate()
@@ -110,7 +139,7 @@ public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
                 self.pendingAlertMessage = alertMessage
 
                 let session = self.makeTagReaderSession(
-                    pollingOptions: [.iso14443, .iso15693, .iso18092],
+                    pollingOptions: pollingOptions,
                     alertMessage: alertMessage
                 )
                 self.pendingStartSession = session
