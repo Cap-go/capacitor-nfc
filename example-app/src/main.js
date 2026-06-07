@@ -19,7 +19,9 @@ const LOG_LIMIT = 40;
 
 function appendLog(message, data) {
   const timestamp = new Date().toLocaleTimeString();
-  const formatted = data ? `${timestamp}  ${message}\n${JSON.stringify(data, null, 2)}` : `${timestamp}  ${message}`;
+  const formatted = data
+    ? `${timestamp}  ${message}\n${JSON.stringify(data, null, 2)}`
+    : `${timestamp}  ${message}`;
   logBuffer.unshift(formatted);
   if (logBuffer.length > LOG_LIMIT) {
     logBuffer.pop();
@@ -148,7 +150,7 @@ CapacitorNfc.addListener('nfcEvent', async (event) => {
   sessionActive = true;
   updateSessionIndicator(true);
   appendLog('📡 Tag discovered', event);
-  
+
   // Stop scanning after reading the tag
   try {
     await CapacitorNfc.stopScanning();
