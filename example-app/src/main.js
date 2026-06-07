@@ -1,3 +1,5 @@
+import { CapacitorUpdater } from '@capgo/capacitor-updater';
+import { Capacitor } from '@capacitor/core';
 import './style.css';
 import { CapacitorNfc } from '@capgo/capacitor-nfc';
 
@@ -182,3 +184,9 @@ CapacitorNfc.addListener('nfcStateChange', (event) => {
     appendLog('⚠️ Unable to check NFC hardware support', error);
   }
 })();
+
+if (Capacitor.isNativePlatform()) {
+  CapacitorUpdater.notifyAppReady().catch((error) => {
+    console.error('Capgo notifyAppReady failed', error);
+  });
+}
