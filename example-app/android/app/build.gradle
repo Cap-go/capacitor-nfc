@@ -4,7 +4,7 @@ android {
     namespace = "app.capgo.downloader"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId = "app.capgo.downloader"
+        applicationId = "app.capgo.nfc.example"
         minSdkVersion = rootProject.ext.minSdkVersion
         targetSdkVersion = rootProject.ext.targetSdkVersion
         versionCode = 1
