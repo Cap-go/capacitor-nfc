@@ -527,6 +527,12 @@ extension NfcPlugin: NFCNDEFReaderSessionDelegate {
 
                 tag.readNDEF { message, readError in
                     if let readError {
+                        if !self.invalidateAfterFirstRead && status == .readWrite {
+                            self.currentTag = tag
+                            let event = self.buildEvent(tag: tag, status: status, capacity: capacity, message: nil)
+                            self.notify(event: event)
+                            return
+                        }
                         session.invalidate(errorMessage: "Failed to read NDEF message: \(readError.localizedDescription)")
                         return
                     }
@@ -706,7 +712,7 @@ extension NfcPlugin: NFCTagReaderSessionDelegate {
 
             if error == nil && status != .notSupported {
                 // Tag supports NDEF, try to read it
-                tag.readNDEF { [weak self] message, _ in
+                tag.readNDEF { [weak self] message, readError in
                     guard let self else {
                         return
                     }
@@ -717,8 +723,10 @@ extension NfcPlugin: NFCTagReaderSessionDelegate {
                     if message == nil {
                         // Blank tag or NDEF read failed - emit tag with UID and status info
                         self.emitTagEvent(tag: tag, status: status, capacity: capacity, message: nil, session: session)
+                    } else if readError != nil && self.invalidateAfterFirstRead {
+                        session.invalidate(errorMessage: "Failed to read NDEF message: \(readError!.localizedDescription)")
                     } else {
-                        // Successfully read NDEF
+                        // Successfully read NDEF (or keep session open for writes after a read error)
                         self.currentTag = tag
                         let event = self.buildEvent(tag: tag, status: status, capacity: capacity, message: message)
                         self.notify(event: event)
