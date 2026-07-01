@@ -14,6 +14,7 @@ const textInput = document.getElementById('text-input');
 const langInput = document.getElementById('lang-input');
 
 let sessionActive = false;
+let sessionInvalidateAfterFirstRead = true;
 const logBuffer = [];
 const LOG_LIMIT = 40;
 
@@ -97,6 +98,7 @@ async function refreshStatus() {
 
 startButton.addEventListener('click', async () => {
   try {
+    sessionInvalidateAfterFirstRead = false;
     await CapacitorNfc.startScanning({
       invalidateAfterFirstRead: false,
       alertMessage: 'Hold an NFC tag near the top of your device.',
@@ -151,14 +153,17 @@ CapacitorNfc.addListener('nfcEvent', async (event) => {
   updateSessionIndicator(true);
   appendLog('📡 Tag discovered', event);
 
-  // Stop scanning after reading the tag
-  try {
-    await CapacitorNfc.stopScanning();
-    sessionActive = false;
-    updateSessionIndicator(false);
-    appendLog('🛑 Scanning stopped after reading tag');
-  } catch (error) {
-    appendLog('⚠️ Failed to stop scanning after reading tag', error);
+  if (sessionInvalidateAfterFirstRead) {
+    try {
+      await CapacitorNfc.stopScanning();
+      sessionActive = false;
+      updateSessionIndicator(false);
+      appendLog('🛑 Scanning stopped after reading tag');
+    } catch (error) {
+      appendLog('⚠️ Failed to stop scanning after reading tag', error);
+    }
+  } else {
+    appendLog('ℹ️ Tag ready for writing — keep it on the reader and tap Write.');
   }
 });
 
