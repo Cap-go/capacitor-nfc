@@ -301,7 +301,9 @@ public class CapacitorNfcPlugin extends Plugin {
                         ndef.writeNdefMessage(message);
                         call.resolve();
                     }
-                    ndef.close();
+                    if (ndef.isConnected()) {
+                        ndef.close();
+                    }
                 } else if (allowFormat) {
                     NdefFormatable formatable = NdefFormatable.get(tag);
                     if (formatable != null) {
