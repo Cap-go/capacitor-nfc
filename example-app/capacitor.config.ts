@@ -4,7 +4,7 @@ import pkg from './package.json';
 
 const config: CapacitorConfig = {
   appId: 'app.capgo.nfc.example',
-  appName: 'NFC Example',
+  appName: '@capgo/capacitor-nfc',
   webDir: 'dist',
   plugins: {
     SplashScreen: {
