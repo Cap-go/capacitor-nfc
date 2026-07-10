@@ -17,7 +17,7 @@ func nfcSessionEndReason(for error: Error) -> String? {
 
 @objc(NfcPlugin)
 public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
-    private let pluginVersion: String = "8.1.7"
+    private let pluginVersion: String = "8.2.0"
 
     public let identifier = "NfcPlugin"
     public let jsName = "CapacitorNfc"
