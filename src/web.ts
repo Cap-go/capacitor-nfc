@@ -2,6 +2,7 @@ import { WebPlugin } from '@capacitor/core';
 
 import type {
   CapacitorNfcPlugin,
+  NfcSessionEndEvent,
   NfcStateChangeEvent,
   NfcEvent,
   ShareTagOptions,
@@ -67,6 +68,10 @@ export class CapacitorNfcWeb extends WebPlugin implements CapacitorNfcPlugin {
   addListener(
     eventName: 'nfcStateChange',
     listenerFunc: (event: NfcStateChangeEvent) => void,
+  ): Promise<PluginListenerHandle>;
+  addListener(
+    eventName: 'nfcSessionEnd',
+    listenerFunc: (event: NfcSessionEndEvent) => void,
   ): Promise<PluginListenerHandle>;
   async addListener(eventName: string, _listenerFunc: (..._args: any[]) => any): Promise<PluginListenerHandle> {
     this.unsupported(`addListener(${eventName})`);
