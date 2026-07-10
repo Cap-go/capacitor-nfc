@@ -133,7 +133,8 @@ export interface StartScanningOptions {
   iosPollingOptions?: NfcIosPollingOption[];
   /**
    * Android-only: raw flags passed to `NfcAdapter.enableReaderMode`.
-   * Defaults to enabling all tag types with skipping NDEF checks.
+   * Defaults to enabling all tag types and Android's NDEF discovery so that
+   * detected tags remain available for writing and formatting.
    */
   androidReaderModeFlags?: number;
 }
