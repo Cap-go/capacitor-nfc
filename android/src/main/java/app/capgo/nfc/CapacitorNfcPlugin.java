@@ -169,6 +169,8 @@ public class CapacitorNfcPlugin extends Plugin {
                 } else {
                     call.reject("Failed to make the tag read only.");
                 }
+            } catch (SecurityException | IllegalStateException e) {
+                call.reject("Tag connection lost.", e);
             } catch (IOException e) {
                 call.reject("Failed to make the tag read only.", e);
             }
@@ -317,6 +319,8 @@ public class CapacitorNfcPlugin extends Plugin {
                 } else {
                     call.reject("Tag does not support NDEF.");
                 }
+            } catch (SecurityException | IllegalStateException e) {
+                call.reject("Tag connection lost.", e);
             } catch (IOException | FormatException e) {
                 call.reject("Failed to write NDEF message.", e);
             }
