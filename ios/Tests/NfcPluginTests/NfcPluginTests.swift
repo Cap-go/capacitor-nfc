@@ -7,4 +7,9 @@ final class NfcPluginTests: XCTestCase {
         let plugin = NfcPlugin()
         XCTAssertNotNil(plugin)
     }
+
+    func testDefaultIosPollingOptionsExcludeFelica() {
+        XCTAssertEqual(NfcPlugin.defaultIosPollingOptions, ["iso14443", "iso15693"])
+        XCTAssertFalse(NfcPlugin.defaultIosPollingOptions.contains("iso18092"))
+    }
 }

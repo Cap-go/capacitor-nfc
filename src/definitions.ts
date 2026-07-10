@@ -128,7 +128,8 @@ export interface StartScanningOptions {
   iosSessionType?: 'ndef' | 'tag';
   /**
    * iOS-only: polling options to use for NFC scanning.
-   * Defaults to `['iso14443', 'iso15693', 'iso18092']` for backward compatibility.
+   * Defaults to `['iso14443', 'iso15693']`. Apps that scan FeliCa tags can opt in
+   * to `'iso18092'` after configuring the required FeliCa entitlement and system codes.
    */
   iosPollingOptions?: NfcIosPollingOption[];
   /**

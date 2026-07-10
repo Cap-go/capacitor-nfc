@@ -5,6 +5,7 @@ import UIKit
 @objc(NfcPlugin)
 public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
     private let pluginVersion: String = "8.1.7"
+    static let defaultIosPollingOptions = ["iso14443", "iso15693"]
 
     public let identifier = "NfcPlugin"
     public let jsName = "CapacitorNfc"
@@ -111,7 +112,7 @@ public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
         invalidateAfterFirstRead = call.getBool("invalidateAfterFirstRead", true)
         let alertMessage = call.getString("alertMessage")
 
-        let requestedPollingOptions = call.getArray("iosPollingOptions", ["iso14443", "iso15693", "iso18092"])
+        let requestedPollingOptions = call.getArray("iosPollingOptions", Self.defaultIosPollingOptions)
         let pollingOptions = self.pollingOptions(requestedPollingOptions)
         guard sessionType != "tag" || !pollingOptions.isEmpty else {
             call.reject("No valid polling options provided")
