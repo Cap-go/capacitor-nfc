@@ -39,12 +39,11 @@ public class CapacitorNfcPlugin extends Plugin {
 
     private static final String TAG = "CapacitorNfcPlugin";
     private static final String pluginVersion = "7.0.5";
-    private static final int DEFAULT_READER_FLAGS =
+    static final int DEFAULT_READER_FLAGS =
         NfcAdapter.FLAG_READER_NFC_A |
         NfcAdapter.FLAG_READER_NFC_B |
         NfcAdapter.FLAG_READER_NFC_F |
         NfcAdapter.FLAG_READER_NFC_V |
-        NfcAdapter.FLAG_READER_SKIP_NDEF_CHECK |
         NfcAdapter.FLAG_READER_NO_PLATFORM_SOUNDS;
 
     private NfcAdapter adapter;
@@ -169,6 +168,8 @@ public class CapacitorNfcPlugin extends Plugin {
                 } else {
                     call.reject("Failed to make the tag read only.");
                 }
+            } catch (SecurityException | IllegalStateException e) {
+                call.reject("Tag connection lost.", e);
             } catch (IOException e) {
                 call.reject("Failed to make the tag read only.", e);
             }
@@ -317,6 +318,8 @@ public class CapacitorNfcPlugin extends Plugin {
                 } else {
                     call.reject("Tag does not support NDEF.");
                 }
+            } catch (SecurityException | IllegalStateException e) {
+                call.reject("Tag connection lost.", e);
             } catch (IOException | FormatException e) {
                 call.reject("Failed to write NDEF message.", e);
             }

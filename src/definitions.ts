@@ -134,7 +134,8 @@ export interface StartScanningOptions {
   iosPollingOptions?: NfcIosPollingOption[];
   /**
    * Android-only: raw flags passed to `NfcAdapter.enableReaderMode`.
-   * Defaults to enabling all tag types with skipping NDEF checks.
+   * Defaults to enabling all tag types and Android's NDEF discovery so that
+   * detected tags remain available for writing and formatting.
    */
   androidReaderModeFlags?: number;
 }
@@ -167,6 +168,15 @@ export interface ShareTagOptions {
 export interface NfcStateChangeEvent {
   status: NfcStatus;
   enabled: boolean;
+}
+
+/**
+ * Event emitted when an iOS NFC reader session ends.
+ *
+ * This event is not emitted when a session closes normally after its first successful read.
+ */
+export interface NfcSessionEndEvent {
+  reason: 'userCancelled' | 'sessionTimeout' | 'invalidated';
 }
 
 /**
@@ -236,6 +246,10 @@ export interface CapacitorNfcPlugin {
   addListener(
     eventName: 'nfcStateChange',
     listenerFunc: (event: NfcStateChangeEvent) => void,
+  ): Promise<PluginListenerHandle>;
+  addListener(
+    eventName: 'nfcSessionEnd',
+    listenerFunc: (event: NfcSessionEndEvent) => void,
   ): Promise<PluginListenerHandle>;
 }
 
