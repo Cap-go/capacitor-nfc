@@ -2,6 +2,19 @@ import Capacitor
 import CoreNFC
 import UIKit
 
+func nfcSessionEndReason(for error: Error) -> String? {
+    switch (error as NSError).code {
+    case NFCReaderError.readerSessionInvalidationErrorFirstNDEFTagRead.rawValue:
+        return nil
+    case NFCReaderError.readerSessionInvalidationErrorUserCanceled.rawValue:
+        return "userCancelled"
+    case NFCReaderError.readerSessionInvalidationErrorSessionTimeout.rawValue:
+        return "sessionTimeout"
+    default:
+        return "invalidated"
+    }
+}
+
 @objc(NfcPlugin)
 public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
     private let pluginVersion: String = "8.1.7"
@@ -44,6 +57,16 @@ public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
 
     private func isNfcAvailable() -> Bool {
         NFCTagReaderSession.readingAvailable || NFCNDEFReaderSession.readingAvailable
+    }
+
+    private func notifySessionEnd(for error: Error) {
+        guard let reason = nfcSessionEndReason(for: error) else {
+            return
+        }
+
+        DispatchQueue.main.async {
+            self.notifyListeners("nfcSessionEnd", data: ["reason": reason], retainUntilConsumed: true)
+        }
     }
 
     private func pollingOptions(_ requestedPollingOptions: JSArray) -> NFCTagReaderSession.PollingOption {
@@ -492,6 +515,7 @@ public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
 extension NfcPlugin: NFCNDEFReaderSessionDelegate {
     public func readerSession(_ session: NFCNDEFReaderSession, didInvalidateWithError error: Error) {
         currentTag = nil
+        notifySessionEnd(for: error)
         if (error as NSError).code != NFCReaderError.readerSessionInvalidationErrorFirstNDEFTagRead.rawValue {
             DispatchQueue.main.async {
                 let payload: [String: Any] = [
@@ -632,6 +656,7 @@ extension NfcPlugin: NFCTagReaderSessionDelegate {
                 return
             }
 
+            notifySessionEnd(for: error)
             pendingStartCall = nil
             pendingStartSession = nil
             pendingAlertMessage = nil
@@ -651,6 +676,7 @@ extension NfcPlugin: NFCTagReaderSessionDelegate {
         }
 
         currentTag = nil
+        notifySessionEnd(for: error)
 
         // Don't emit state change for normal session completion (user canceled)
         // Also check for successful read completion

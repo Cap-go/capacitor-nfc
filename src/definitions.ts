@@ -170,6 +170,15 @@ export interface NfcStateChangeEvent {
 }
 
 /**
+ * Event emitted when an iOS NFC reader session ends.
+ *
+ * This event is not emitted when a session closes normally after its first successful read.
+ */
+export interface NfcSessionEndEvent {
+  reason: 'userCancelled' | 'sessionTimeout' | 'invalidated';
+}
+
+/**
  * Public API surface for the Capacitor NFC plugin.
  *
  * The interface intentionally mirrors the behaviour of the reference PhoneGap
@@ -236,6 +245,10 @@ export interface CapacitorNfcPlugin {
   addListener(
     eventName: 'nfcStateChange',
     listenerFunc: (event: NfcStateChangeEvent) => void,
+  ): Promise<PluginListenerHandle>;
+  addListener(
+    eventName: 'nfcSessionEnd',
+    listenerFunc: (event: NfcSessionEndEvent) => void,
   ): Promise<PluginListenerHandle>;
 }
 

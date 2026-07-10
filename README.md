@@ -147,6 +147,23 @@ await listener.remove();
 await CapacitorNfc.stopScanning();
 ```
 
+### Handling iOS session endings
+
+Listen for `nfcSessionEnd` to distinguish a user cancellation from a session timeout or another Core NFC error. The event is available for both `ndef` and `tag` iOS sessions. A normal first-read completion does not emit this event.
+
+```ts
+const sessionEndListener = await CapacitorNfc.addListener('nfcSessionEnd', ({ reason }) => {
+  if (reason === 'userCancelled') {
+    return;
+  }
+
+  console.warn(reason === 'sessionTimeout' ? 'No tag detected. Try again.' : 'The NFC session failed.');
+});
+
+// Later, when the listener is no longer needed
+await sessionEndListener.remove();
+```
+
 ## API
 
 <docgen-index>
@@ -165,6 +182,7 @@ await CapacitorNfc.stopScanning();
 * [`addListener('nfcEvent', ...)`](#addlistenernfcevent-)
 * [`addListener('tagDiscovered' | 'ndefDiscovered' | 'ndefMimeDiscovered' | 'ndefFormatableDiscovered', ...)`](#addlistenertagdiscovered--ndefdiscovered--ndefmimediscovered--ndefformatablediscovered-)
 * [`addListener('nfcStateChange', ...)`](#addlistenernfcstatechange-)
+* [`addListener('nfcSessionEnd', ...)`](#addlistenernfcsessionend-)
 * [Interfaces](#interfaces)
 * [Type Aliases](#type-aliases)
 
@@ -372,6 +390,22 @@ addListener(eventName: 'nfcStateChange', listenerFunc: (event: NfcStateChangeEve
 --------------------
 
 
+### addListener('nfcSessionEnd', ...)
+
+```typescript
+addListener(eventName: 'nfcSessionEnd', listenerFunc: (event: NfcSessionEndEvent) => void) => Promise<PluginListenerHandle>
+```
+
+| Param              | Type                                                                                  |
+| ------------------ | ------------------------------------------------------------------------------------- |
+| **`eventName`**    | <code>'nfcSessionEnd'</code>                                                          |
+| **`listenerFunc`** | <code>(event: <a href="#nfcsessionendevent">NfcSessionEndEvent</a>) =&gt; void</code> |
+
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
+
+--------------------
+
+
 ### Interfaces
 
 
@@ -467,6 +501,17 @@ Event emitted whenever the NFC adapter availability changes.
 | ------------- | ----------------------------------------------- |
 | **`status`**  | <code><a href="#nfcstatus">NfcStatus</a></code> |
 | **`enabled`** | <code>boolean</code>                            |
+
+
+#### NfcSessionEndEvent
+
+Event emitted when an iOS NFC reader session ends.
+
+This event is not emitted when a session closes normally after its first successful read.
+
+| Prop         | Type                                                              |
+| ------------ | ----------------------------------------------------------------- |
+| **`reason`** | <code>'userCancelled' \| 'sessionTimeout' \| 'invalidated'</code> |
 
 
 ### Type Aliases
