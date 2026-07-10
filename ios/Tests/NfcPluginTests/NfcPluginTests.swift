@@ -9,6 +9,11 @@ final class NfcPluginTests: XCTestCase {
         XCTAssertNotNil(plugin)
     }
 
+    func testDefaultIosPollingOptionsExcludeFelica() {
+        XCTAssertEqual(NfcPlugin.defaultIosPollingOptions, ["iso14443", "iso15693"])
+        XCTAssertFalse(NfcPlugin.defaultIosPollingOptions.contains("iso18092"))
+    }
+
     func testSessionEndReasons() {
         XCTAssertEqual(reason(for: NFCReaderError.readerSessionInvalidationErrorUserCanceled.rawValue), "userCancelled")
         XCTAssertEqual(reason(for: NFCReaderError.readerSessionInvalidationErrorSessionTimeout.rawValue), "sessionTimeout")
