@@ -578,9 +578,7 @@ public class CapacitorNfcPlugin extends Plugin {
                 throw new IOException("Tag does not expose NfcA.");
             }
             nfcA.connect();
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                defaultNfcATimeout = nfcA.getTimeout();
-            }
+            defaultNfcATimeout = nfcA.getTimeout();
             applyNfcATimeout(nfcA, timeout);
             connectedNfcA = nfcA;
             transceiveTag = tag;
