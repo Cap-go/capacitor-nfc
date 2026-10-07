@@ -18,11 +18,11 @@ Read and write NFC tags from your Capacitor app on iOS and Android. A modern Cap
 ## Key features
 
 - **Scan tags**: `startScanning()` and `stopScanning()`, with `tagDiscovered` and `nfcEvent` listeners.
-- **Write NDEF**: `write()` sends NDEF records to the last discovered tag.
-- **Tag management**: `erase()` and `makeReadOnly()`.
+- **Write NDEF**: `write()` sends NDEF records to the last discovered tag. On iOS, keep the session open with `invalidateAfterFirstRead: false`.
+- **Tag management**: `erase()`, plus `makeReadOnly()` on Android.
 - **Adapter status**: `isSupported()`, `getStatus()`, `showSettings()` and the `nfcStateChange` event.
 - **iOS session options**: NDEF or tag sessions, polling options and a custom alert message.
-- **Android P2P**: `share()` and `unshare()` for peer-to-peer messages.
+- **Android P2P**: `share()` and `unshare()` for peer-to-peer messages, before Android 10 only.
 - **Platforms**: iOS and Android. iOS uses Core NFC, Android uses `NfcAdapter`. Not available on web.
 
 Native NFC tag detection, reading, and writing for Capacitor apps on iOS and Android.
