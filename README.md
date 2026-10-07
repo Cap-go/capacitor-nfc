@@ -487,7 +487,7 @@ Options for sending a raw command to the current tag.
 | ------------- | --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **`data`**    | <code>number[]</code>                                     | Raw request frame without CRC. For ISO 15693 (`nfcV`), the first byte is the request flags and the second byte is the command code, followed by any command parameters. The response includes the response flags as the first byte. |
 | **`tech`**    | <code><a href="#transceivetech">TransceiveTech</a></code> | Which technology to use. Defaults to the technology detected for the current tag.                                                                                                                                                   |
-| **`timeout`** | <code>number</code>                                       | Android only: transceive timeout in milliseconds when the selected technology supports it.                                                                                                                                          |
+| **`timeout`** | <code>number</code>                                       | Android only: transceive timeout in milliseconds for NFC-A (`nfcA`). Ignored for ISO 15693 (`nfcV`).                                                                                                                                |
 
 
 #### ShareTagOptions

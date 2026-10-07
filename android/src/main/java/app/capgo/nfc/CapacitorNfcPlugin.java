@@ -559,14 +559,9 @@ public class CapacitorNfcPlugin extends Plugin {
             if (nfcV == null) {
                 throw new IOException("Tag does not expose NfcV.");
             }
-            if (timeout != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                nfcV.setTimeout(timeout);
-            }
             nfcV.connect();
             connectedNfcV = nfcV;
             transceiveTag = tag;
-        } else if (timeout != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            nfcV.setTimeout(timeout);
         }
 
         return nfcV.transceive(frame);

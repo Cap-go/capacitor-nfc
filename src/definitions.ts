@@ -186,7 +186,7 @@ export interface TransceiveOptions {
    */
   tech?: TransceiveTech;
   /**
-   * Android only: transceive timeout in milliseconds when the selected technology supports it.
+   * Android only: transceive timeout in milliseconds for NFC-A (`nfcA`). Ignored for ISO 15693 (`nfcV`).
    */
   timeout?: number;
 }
