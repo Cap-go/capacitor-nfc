@@ -163,6 +163,45 @@ export interface ShareTagOptions {
 }
 
 /**
+ * NFC technology used for {@link CapacitorNfcPlugin.transceive}.
+ *
+ * - `nfcV`: ISO 15693 (for example ST25DV).
+ * - `nfcA`: NFC-A / MIFARE (for example NTAG I2C plus).
+ */
+export type TransceiveTech = 'nfcV' | 'nfcA';
+
+/**
+ * Options for sending a raw command to the current tag.
+ */
+export interface TransceiveOptions {
+  /**
+   * Raw request frame without CRC.
+   *
+   * For ISO 15693 (`nfcV`), the first byte is the request flags and the second byte is the command code,
+   * followed by any command parameters. The response includes the response flags as the first byte.
+   */
+  data: number[];
+  /**
+   * Which technology to use. Defaults to the technology detected for the current tag.
+   */
+  tech?: TransceiveTech;
+  /**
+   * Android only: transceive timeout in milliseconds when the selected technology supports it.
+   */
+  timeout?: number;
+}
+
+/**
+ * Result of a successful {@link CapacitorNfcPlugin.transceive} call.
+ */
+export interface TransceiveResult {
+  /**
+   * Raw response frame from the tag (ISO 15693 responses include the response flags as the first byte).
+   */
+  response: number[];
+}
+
+/**
  * Event emitted whenever the NFC adapter availability changes.
  */
 export interface NfcStateChangeEvent {
@@ -206,6 +245,14 @@ export interface CapacitorNfcPlugin {
    * Attempts to make the last discovered tag read-only.
    */
   makeReadOnly(): Promise<void>;
+  /**
+   * Sends a raw command to the last discovered tag while it remains in the field.
+   *
+   * On Android, uses `NfcV` or `NfcA` on the same tag as {@link CapacitorNfcPlugin.write}.
+   * On iOS, requires an active tag reader session (`iosSessionType: 'tag'`) with
+   * `invalidateAfterFirstRead: false`, and uses ISO 15693 or MIFARE commands on the connected tag.
+   */
+  transceive(options: TransceiveOptions): Promise<TransceiveResult>;
   /**
    * Shares an NDEF message with another device via peer-to-peer (Android only).
    */

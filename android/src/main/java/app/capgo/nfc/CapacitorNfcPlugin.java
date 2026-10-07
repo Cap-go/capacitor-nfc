@@ -14,6 +14,7 @@ import android.nfc.tech.MifareUltralight;
 import android.nfc.tech.Ndef;
 import android.nfc.tech.NdefFormatable;
 import android.nfc.tech.NfcA;
+import android.nfc.tech.NfcV;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
@@ -55,6 +56,10 @@ public class CapacitorNfcPlugin extends Plugin {
     private NdefMessage sharedMessage = null;
     private NfcStateReceiver stateReceiver;
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
+    private final Object transceiveLock = new Object();
+    private NfcV connectedNfcV;
+    private NfcA connectedNfcA;
+    private Tag transceiveTag;
 
     private final NfcAdapter.ReaderCallback readerCallback = this::onTagDiscovered;
 
@@ -145,6 +150,68 @@ public class CapacitorNfcPlugin extends Plugin {
     }
 
     @PluginMethod
+    public void transceive(PluginCall call) {
+        JSArray dataArray = call.getArray("data");
+        if (dataArray == null || dataArray.length() == 0) {
+            call.reject("data is required and must be a non-empty array of byte values.");
+            return;
+        }
+
+        Tag tag = lastTag.get();
+        if (tag == null) {
+            call.reject("No NFC tag available. Call startScanning and tap a tag before transceive.");
+            return;
+        }
+
+        String techOption = call.getString("tech");
+        Integer timeout = call.hasOption("timeout") ? call.getInt("timeout") : null;
+
+        byte[] frame;
+        try {
+            frame = jsArrayToBytes(dataArray);
+        } catch (IllegalArgumentException e) {
+            call.reject(e.getMessage());
+            return;
+        }
+
+        executor.execute(() -> {
+            try {
+                String tech = resolveTransceiveTech(tag, techOption);
+                if (tech == null) {
+                    call.reject("Tag does not support transceive for the requested technology.");
+                    return;
+                }
+
+                byte[] response;
+                synchronized (transceiveLock) {
+                    if (transceiveTag != null && !Arrays.equals(transceiveTag.getId(), tag.getId())) {
+                        closeTransceiveConnections();
+                    }
+                    transceiveTag = tag;
+
+                    if ("nfcV".equals(tech)) {
+                        response = transceiveNfcV(tag, frame, timeout);
+                    } else {
+                        response = transceiveNfcA(tag, frame, timeout);
+                    }
+                }
+
+                JSObject result = new JSObject();
+                result.put("response", bytesToJsArray(response));
+                call.resolve(result);
+            } catch (SecurityException | IllegalStateException e) {
+                closeTransceiveConnections();
+                call.reject("Tag connection lost.", e);
+            } catch (IOException e) {
+                closeTransceiveConnections();
+                call.reject("Transceive failed.", e);
+            } catch (IllegalArgumentException e) {
+                call.reject(e.getMessage());
+            }
+        });
+    }
+
+    @PluginMethod
     public void makeReadOnly(PluginCall call) {
         Tag tag = lastTag.get();
         if (tag == null) {
@@ -153,6 +220,9 @@ public class CapacitorNfcPlugin extends Plugin {
         }
 
         executor.execute(() -> {
+            synchronized (transceiveLock) {
+                closeTransceiveConnections();
+            }
             Ndef ndef = Ndef.get(tag);
             if (ndef == null) {
                 call.reject("Tag does not support NDEF.");
@@ -290,6 +360,9 @@ public class CapacitorNfcPlugin extends Plugin {
 
     private void performWrite(PluginCall call, Tag tag, NdefMessage message, boolean allowFormat) {
         executor.execute(() -> {
+            synchronized (transceiveLock) {
+                closeTransceiveConnections();
+            }
             Ndef ndef = Ndef.get(tag);
             try {
                 if (ndef != null) {
@@ -413,9 +486,131 @@ public class CapacitorNfcPlugin extends Plugin {
             }
         }
 
-        lastTag.set(tag);
+        Tag previous = lastTag.getAndSet(tag);
+        if (previous != null && !Arrays.equals(previous.getId(), tag.getId())) {
+            synchronized (transceiveLock) {
+                closeTransceiveConnections();
+            }
+        }
         lastMessage.set(message);
         emitTagEvent(tag, message);
+    }
+
+    private static byte[] jsArrayToBytes(JSArray array) throws IllegalArgumentException {
+        try {
+            byte[] bytes = new byte[array.length()];
+            for (int i = 0; i < array.length(); i++) {
+                int value = array.getInt(i);
+                if (value < 0 || value > 255) {
+                    throw new IllegalArgumentException("data values must be between 0 and 255.");
+                }
+                bytes[i] = (byte) value;
+            }
+            return bytes;
+        } catch (JSONException e) {
+            throw new IllegalArgumentException("data must be an array of byte values.");
+        }
+    }
+
+    private static JSArray bytesToJsArray(byte[] bytes) {
+        JSArray array = new JSArray();
+        for (byte b : bytes) {
+            array.put(b & 0xFF);
+        }
+        return array;
+    }
+
+    private String resolveTransceiveTech(Tag tag, String requested) {
+        boolean hasV = Arrays.asList(tag.getTechList()).contains(NfcV.class.getName());
+        boolean hasA = Arrays.asList(tag.getTechList()).contains(NfcA.class.getName());
+
+        if (requested != null) {
+            if ("nfcV".equals(requested)) {
+                return hasV ? "nfcV" : null;
+            }
+            if ("nfcA".equals(requested)) {
+                return hasA ? "nfcA" : null;
+            }
+            return null;
+        }
+
+        if (hasV) {
+            return "nfcV";
+        }
+        if (hasA) {
+            return "nfcA";
+        }
+        return null;
+    }
+
+    private byte[] transceiveNfcV(Tag tag, byte[] frame, Integer timeout) throws IOException {
+        if (frame.length < 2) {
+            throw new IllegalArgumentException("ISO 15693 frames require at least flags and command code bytes.");
+        }
+
+        NfcV nfcV = connectedNfcV;
+        if (nfcV == null || transceiveTag != tag) {
+            closeTransceiveConnections();
+            nfcV = NfcV.get(tag);
+            if (nfcV == null) {
+                throw new IOException("Tag does not expose NfcV.");
+            }
+            if (timeout != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                nfcV.setTimeout(timeout);
+            }
+            nfcV.connect();
+            connectedNfcV = nfcV;
+            transceiveTag = tag;
+        } else if (timeout != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            nfcV.setTimeout(timeout);
+        }
+
+        return nfcV.transceive(frame);
+    }
+
+    private byte[] transceiveNfcA(Tag tag, byte[] frame, Integer timeout) throws IOException {
+        NfcA nfcA = connectedNfcA;
+        if (nfcA == null || transceiveTag != tag) {
+            closeTransceiveConnections();
+            nfcA = NfcA.get(tag);
+            if (nfcA == null) {
+                throw new IOException("Tag does not expose NfcA.");
+            }
+            if (timeout != null) {
+                nfcA.setTimeout(timeout);
+            }
+            nfcA.connect();
+            connectedNfcA = nfcA;
+            transceiveTag = tag;
+        } else if (timeout != null) {
+            nfcA.setTimeout(timeout);
+        }
+
+        return nfcA.transceive(frame);
+    }
+
+    private void closeTransceiveConnections() {
+        if (connectedNfcV != null) {
+            try {
+                if (connectedNfcV.isConnected()) {
+                    connectedNfcV.close();
+                }
+            } catch (IOException ex) {
+                Log.w(TAG, "Failed to close NfcV connection", ex);
+            }
+            connectedNfcV = null;
+        }
+        if (connectedNfcA != null) {
+            try {
+                if (connectedNfcA.isConnected()) {
+                    connectedNfcA.close();
+                }
+            } catch (IOException ex) {
+                Log.w(TAG, "Failed to close NfcA connection", ex);
+            }
+            connectedNfcA = null;
+        }
+        transceiveTag = null;
     }
 
     /**

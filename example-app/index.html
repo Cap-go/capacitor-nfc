@@ -36,6 +36,17 @@
       </section>
 
       <section class="write-card">
+        <h2>Raw transceive</h2>
+        <p class="hint">
+          On iOS, start scanning with <code>iosSessionType: 'tag'</code>. Keep the tag on the reader. Enter comma-separated
+          decimal bytes (ISO 15693: flags, command, parameters).
+        </p>
+        <label for="transceive-input">Request bytes</label>
+        <input id="transceive-input" type="text" value="2,32,0" />
+        <button id="transceive-btn" class="secondary">Send transceive</button>
+      </section>
+
+      <section class="write-card">
         <h2>Write sample text</h2>
         <p class="hint">Scanning must stay active with <code>invalidateAfterFirstRead = false</code> to write a tag.</p>
         <label for="text-input">Text payload</label>

@@ -28,6 +28,7 @@ public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "write", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "erase", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "makeReadOnly", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "transceive", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "share", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "unshare", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getStatus", returnType: CAPPluginReturnPromise),
@@ -259,6 +260,104 @@ public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc public func makeReadOnly(_ call: CAPPluginCall) {
         call.reject("Making tags read only is not supported on iOS.", "UNSUPPORTED")
+    }
+
+    @objc public func transceive(_ call: CAPPluginCall) {
+        #if targetEnvironment(simulator)
+        call.reject("NFC is not available on the simulator.", "NO_NFC")
+        return
+        #else
+        guard tagReaderSession != nil else {
+            call.reject(
+                "transceive requires an active tag reader session. Call startScanning with iosSessionType: 'tag' and invalidateAfterFirstRead: false.",
+                "UNSUPPORTED"
+            )
+            return
+        }
+
+        guard let tag = currentTag else {
+            call.reject("No NFC tag available. Present a tag before calling transceive.")
+            return
+        }
+
+        guard let rawData = call.getArray("data") as? [NSNumber], !rawData.isEmpty else {
+            call.reject("data is required and must be a non-empty array of byte values.")
+            return
+        }
+
+        let frame = data(from: rawData)
+        let requestedTech = call.getString("tech")?.lowercased()
+
+        if let tech = requestedTech, tech != "nfcv", tech != "nfca" {
+            call.reject("Unsupported tech value. Use 'nfcV' or 'nfcA'.")
+            return
+        }
+
+        if requestedTech == "nfcv" || requestedTech == nil {
+            if let isoTag = tag as? NFCISO15693Tag {
+                performIso15693Transceive(tag: isoTag, frame: frame, call: call)
+                return
+            }
+            if requestedTech == "nfcv" {
+                call.reject("Current tag does not support ISO 15693 transceive.")
+                return
+            }
+        }
+
+        if requestedTech == "nfca" || requestedTech == nil {
+            if let miFareTag = tag as? NFCMiFareTag {
+                performMiFareTransceive(tag: miFareTag, frame: frame, call: call)
+                return
+            }
+            if requestedTech == "nfca" {
+                call.reject("Current tag does not support NFC-A / MIFARE transceive.")
+                return
+            }
+        }
+
+        call.reject("Current tag does not support transceive for the requested technology.")
+        #endif
+    }
+
+    private func performIso15693Transceive(tag: NFCISO15693Tag, frame: Data, call: CAPPluginCall) {
+        guard frame.count >= 2 else {
+            call.reject("ISO 15693 frames require at least flags and command code bytes.")
+            return
+        }
+
+        let requestFlags = NFCISO15693RequestFlag(rawValue: frame[frame.startIndex])
+        let commandCode = frame[frame.startIndex + 1]
+        let commandData = frame.count > 2 ? frame.subdata(in: frame.index(frame.startIndex, offsetBy: 2)..<frame.endIndex) : Data()
+
+        tag.sendRequest(requestFlags: requestFlags, commandCode: commandCode, data: commandData) { response, responseFlags, error in
+            DispatchQueue.main.async {
+                if let error {
+                    call.reject("Transceive failed.", nil, error)
+                    return
+                }
+
+                var bytes = [UInt8(responseFlags.rawValue)]
+                bytes.append(contentsOf: response)
+                call.resolve([
+                    "response": bytes.map { NSNumber(value: $0) }
+                ])
+            }
+        }
+    }
+
+    private func performMiFareTransceive(tag: NFCMiFareTag, frame: Data, call: CAPPluginCall) {
+        tag.sendMiFareCommand(commandPacket: frame) { response, error in
+            DispatchQueue.main.async {
+                if let error {
+                    call.reject("Transceive failed.", nil, error)
+                    return
+                }
+
+                call.resolve([
+                    "response": response.map { NSNumber(value: $0) }
+                ])
+            }
+        }
     }
 
     @objc public func share(_ call: CAPPluginCall) {
