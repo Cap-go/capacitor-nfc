@@ -335,18 +335,24 @@ public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
         let commandCode = frame[frame.startIndex + 1]
         let commandData = frame.count > 2 ? frame.subdata(in: frame.index(frame.startIndex, offsetBy: 2)..<frame.endIndex) : Data()
 
-        tag.sendRequest(requestFlags: requestFlags, commandCode: commandCode, data: commandData) { response, responseFlags, error in
+        tag.sendRequest(
+            requestFlags: Int(requestFlags.rawValue),
+            commandCode: Int(commandCode),
+            data: commandData
+        ) { result in
             DispatchQueue.main.async {
-                if let error {
+                switch result {
+                case .success(let (responseFlags, responseData)):
+                    var bytes = [UInt8(responseFlags.rawValue)]
+                    if let responseData {
+                        bytes.append(contentsOf: responseData)
+                    }
+                    call.resolve([
+                        "response": bytes.map { NSNumber(value: $0) }
+                    ])
+                case .failure(let error):
                     call.reject("Transceive failed.", nil, error)
-                    return
                 }
-
-                var bytes = [UInt8(responseFlags.rawValue)]
-                bytes.append(contentsOf: response)
-                call.resolve([
-                    "response": bytes.map { NSNumber(value: $0) }
-                ])
             }
         }
     }
