@@ -1,10 +1,29 @@
 # @capgo/capacitor-nfc
-<a href="https://capgo.app/"><img src="https://capgo.app/readme-banner.svg?repo=Cap-go/capacitor-nfc" alt="Capgo - Instant updates for Capacitor" /></a>
+
+Read and write NFC tags from your Capacitor app on iOS and Android. A modern Capacitor port of the battle-tested phonegap-nfc plugin.
+
+<a href="https://capgo.app/?ref=plugin_nfc"><img src="https://capgo.app/readme-banner.svg?repo=Cap-go/capacitor-nfc" alt="Capgo - Instant updates for Capacitor" /></a>
 
 <div align="center">
-  <h2><a href="https://capgo.app/?ref=plugin_nfc"> ➡️ Get Instant updates for your App with Capgo</a></h2>
-  <h2><a href="https://capgo.app/consulting/?ref=plugin_nfc"> Missing a feature? We’ll build the plugin for you 💪</a></h2>
+  <p><b>Capgo</b>: open-source live updates for Ionic and Capacitor apps. Ship OTA fixes and features instantly, without waiting for app store review.</p>
+  <h2><a href="https://capgo.app/register/?ref=plugin_nfc">➡️ Get started for free</a></h2>
+  <p>14-day unlimited free trial. No credit card required</p>
+  <p><a href="https://capgo.app/consulting/?ref=plugin_nfc">Missing a feature? We'll build the plugin for you 💪</a></p>
 </div>
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/Cap-go/capacitor-nfc/main/assets/github-social-preview.png" alt="@capgo/capacitor-nfc for Capacitor apps" width="300" />
+</p>
+
+## Key features
+
+- **Scan tags**: `startScanning()` and `stopScanning()`, with `tagDiscovered` and `nfcEvent` listeners.
+- **Write NDEF**: `write()` sends NDEF records to the last discovered tag. On iOS, keep the session open with `invalidateAfterFirstRead: false`.
+- **Tag management**: `erase()`, plus `makeReadOnly()` on Android.
+- **Adapter status**: `isSupported()`, `getStatus()`, `showSettings()` and the `nfcStateChange` event.
+- **iOS session options**: NDEF or tag sessions, polling options and a custom alert message.
+- **Android P2P**: `share()` and `unshare()` for peer-to-peer messages, before Android 10 only.
+- **Platforms**: iOS and Android. iOS uses Core NFC, Android uses `NfcAdapter`. Not available on web.
 
 Native NFC tag detection, reading, and writing for Capacitor apps on iOS and Android.
 
