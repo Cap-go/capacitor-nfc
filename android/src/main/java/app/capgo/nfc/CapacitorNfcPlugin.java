@@ -60,6 +60,7 @@ public class CapacitorNfcPlugin extends Plugin {
     private NfcV connectedNfcV;
     private NfcA connectedNfcA;
     private Tag transceiveTag;
+    private int defaultNfcATimeout = -1;
 
     private final NfcAdapter.ReaderCallback readerCallback = this::onTagDiscovered;
 
@@ -185,7 +186,7 @@ public class CapacitorNfcPlugin extends Plugin {
 
                 byte[] response;
                 synchronized (transceiveLock) {
-                    if (transceiveTag != null && !Arrays.equals(transceiveTag.getId(), tag.getId())) {
+                    if (transceiveTag != null && transceiveTag != tag) {
                         closeTransceiveConnections();
                     }
                     transceiveTag = tag;
@@ -201,10 +202,14 @@ public class CapacitorNfcPlugin extends Plugin {
                 result.put("response", bytesToJsArray(response));
                 call.resolve(result);
             } catch (SecurityException | IllegalStateException e) {
-                closeTransceiveConnections();
+                synchronized (transceiveLock) {
+                    closeTransceiveConnections();
+                }
                 call.reject("Tag connection lost.", e);
             } catch (IOException e) {
-                closeTransceiveConnections();
+                synchronized (transceiveLock) {
+                    closeTransceiveConnections();
+                }
                 call.reject("Transceive failed.", e);
             } catch (IllegalArgumentException e) {
                 call.reject(e.getMessage());
@@ -488,7 +493,7 @@ public class CapacitorNfcPlugin extends Plugin {
         }
 
         Tag previous = lastTag.getAndSet(tag);
-        if (previous != null && !Arrays.equals(previous.getId(), tag.getId())) {
+        if (previous != null && previous != tag) {
             synchronized (transceiveLock) {
                 closeTransceiveConnections();
             }
@@ -509,7 +514,7 @@ public class CapacitorNfcPlugin extends Plugin {
             }
             return bytes;
         } catch (JSONException e) {
-            throw new IllegalArgumentException("data must be an array of byte values.");
+            throw new IllegalArgumentException("data must be an array of byte values.", e);
         }
     }
 
@@ -572,14 +577,15 @@ public class CapacitorNfcPlugin extends Plugin {
             if (nfcA == null) {
                 throw new IOException("Tag does not expose NfcA.");
             }
-            if (timeout != null) {
-                nfcA.setTimeout(timeout);
-            }
             nfcA.connect();
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                defaultNfcATimeout = nfcA.getTimeout();
+            }
+            applyNfcATimeout(nfcA, timeout);
             connectedNfcA = nfcA;
             transceiveTag = tag;
-        } else if (timeout != null) {
-            nfcA.setTimeout(timeout);
+        } else {
+            applyNfcATimeout(nfcA, timeout);
         }
 
         return nfcA.transceive(frame);
@@ -607,6 +613,15 @@ public class CapacitorNfcPlugin extends Plugin {
             connectedNfcA = null;
         }
         transceiveTag = null;
+        defaultNfcATimeout = -1;
+    }
+
+    private void applyNfcATimeout(NfcA nfcA, Integer timeout) {
+        if (timeout != null) {
+            nfcA.setTimeout(timeout);
+        } else if (defaultNfcATimeout >= 0) {
+            nfcA.setTimeout(defaultNfcATimeout);
+        }
     }
 
     /**

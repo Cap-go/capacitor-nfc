@@ -285,7 +285,13 @@ public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
 
-        let frame = data(from: rawData)
+        let frame: Data
+        do {
+            frame = try transceiveFrame(from: rawData)
+        } catch {
+            call.reject(error.localizedDescription)
+            return
+        }
         let requestedTech = call.getString("tech")?.lowercased()
 
         if let tech = requestedTech, tech != "nfcv", tech != "nfca" {
@@ -498,6 +504,19 @@ public class NfcPlugin: CAPPlugin, CAPBridgedPlugin {
         bytes.reserveCapacity(numbers.count)
         numbers.forEach { number in
             bytes.append(number.uint8Value)
+        }
+        return Data(bytes)
+    }
+
+    private func transceiveFrame(from numbers: [NSNumber]) throws -> Data {
+        var bytes = [UInt8]()
+        bytes.reserveCapacity(numbers.count)
+        for number in numbers {
+            let value = number.intValue
+            if value < 0 || value > 255 {
+                throw NfcPluginError.invalidTransceiveByte(value)
+            }
+            bytes.append(UInt8(value))
         }
         return Data(bytes)
     }
@@ -914,4 +933,14 @@ extension NfcPlugin: NFCTagReaderSessionDelegate {
 
 enum NfcPluginError: Error {
     case invalidPayload
+    case invalidTransceiveByte(Int)
+
+    var localizedDescription: String {
+        switch self {
+        case .invalidPayload:
+            return "Invalid NDEF records payload."
+        case .invalidTransceiveByte(let value):
+            return "data values must be between 0 and 255. Got \(value)."
+        }
+    }
 }

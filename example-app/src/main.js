@@ -104,6 +104,9 @@ function parseByteList(text) {
     throw new Error('Provide at least one byte value.');
   }
   return parts.map((part) => {
+    if (!/^\d+$/.test(part)) {
+      throw new Error(`Invalid byte value: ${part}`);
+    }
     const value = Number.parseInt(part, 10);
     if (!Number.isFinite(value) || value < 0 || value > 255) {
       throw new Error(`Invalid byte value: ${part}`);
@@ -153,7 +156,7 @@ transceiveButton.addEventListener('click', async () => {
     const { response } = await CapacitorNfc.transceive({ data });
     appendLog('📨 transceive response', { response });
   } catch (error) {
-    appendLog('❌ transceive failed', error);
+    appendLog('❌ transceive failed', { message: error?.message ?? String(error) });
   }
 });
 
