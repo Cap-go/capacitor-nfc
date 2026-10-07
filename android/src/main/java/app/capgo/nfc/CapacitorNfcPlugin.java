@@ -164,7 +164,11 @@ public class CapacitorNfcPlugin extends Plugin {
         }
 
         String techOption = call.getString("tech");
-        Integer timeout = call.hasOption("timeout") ? call.getInt("timeout") : null;
+        Integer timeout = null;
+        JSObject callData = call.getData();
+        if (callData != null && callData.has("timeout")) {
+            timeout = callData.getInteger("timeout");
+        }
 
         byte[] frame;
         try {
