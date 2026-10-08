@@ -192,6 +192,7 @@ await sessionEndListener.remove();
 * [`write(...)`](#write)
 * [`erase()`](#erase)
 * [`makeReadOnly()`](#makereadonly)
+* [`transceive(...)`](#transceive)
 * [`share(...)`](#share)
 * [`unshare()`](#unshare)
 * [`getStatus()`](#getstatus)
@@ -274,6 +275,27 @@ makeReadOnly() => Promise<void>
 ```
 
 Attempts to make the last discovered tag read-only.
+
+--------------------
+
+
+### transceive(...)
+
+```typescript
+transceive(options: TransceiveOptions) => Promise<TransceiveResult>
+```
+
+Sends a raw command to the last discovered tag while it remains in the field.
+
+On Android, uses `NfcV` or `NfcA` on the same tag as {@link CapacitorNfcPlugin.write}.
+On iOS, requires an active tag reader session (`iosSessionType: 'tag'`) with
+`invalidateAfterFirstRead: false`, and uses ISO 15693 or MIFARE commands on the connected tag.
+
+| Param         | Type                                                            |
+| ------------- | --------------------------------------------------------------- |
+| **`options`** | <code><a href="#transceiveoptions">TransceiveOptions</a></code> |
+
+**Returns:** <code>Promise&lt;<a href="#transceiveresult">TransceiveResult</a>&gt;</code>
 
 --------------------
 
@@ -467,6 +489,26 @@ bytes.
 | **`payload`** | <code>number[]</code> | Raw payload expressed as an array of byte values.       |
 
 
+#### TransceiveResult
+
+Result of a successful {@link CapacitorNfcPlugin.transceive} call.
+
+| Prop           | Type                  | Description                                                                                         |
+| -------------- | --------------------- | --------------------------------------------------------------------------------------------------- |
+| **`response`** | <code>number[]</code> | Raw response frame from the tag (ISO 15693 responses include the response flags as the first byte). |
+
+
+#### TransceiveOptions
+
+Options for sending a raw command to the current tag.
+
+| Prop          | Type                                                      | Description                                                                                                                                                                                                                         |
+| ------------- | --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`data`**    | <code>number[]</code>                                     | Raw request frame without CRC. For ISO 15693 (`nfcV`), the first byte is the request flags and the second byte is the command code, followed by any command parameters. The response includes the response flags as the first byte. |
+| **`tech`**    | <code><a href="#transceivetech">TransceiveTech</a></code> | Which technology to use. Defaults to the technology detected for the current tag.                                                                                                                                                   |
+| **`timeout`** | <code>number</code>                                       | Android only: transceive timeout in milliseconds for NFC-A (`nfcA`). Ignored for ISO 15693 (`nfcV`).                                                                                                                                |
+
+
 #### ShareTagOptions
 
 Options used when sharing an NDEF message with another device using Android Beam / P2P mode.
@@ -548,6 +590,16 @@ should detect during a polling sequence.
 - 'pace': Polls for PACE tags (available on iOS 16 and later)
 
 <code>'iso14443' | 'iso15693' | 'iso18092' | 'pace'</code>
+
+
+#### TransceiveTech
+
+NFC technology used for {@link CapacitorNfcPlugin.transceive}.
+
+- `nfcV`: ISO 15693 (for example ST25DV).
+- `nfcA`: NFC-A / MIFARE (for example NTAG I2C plus).
+
+<code>'nfcV' | 'nfcA'</code>
 
 
 #### NfcStatus

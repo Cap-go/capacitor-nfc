@@ -7,6 +7,8 @@ import type {
   NfcEvent,
   ShareTagOptions,
   StartScanningOptions,
+  TransceiveOptions,
+  TransceiveResult,
   WriteTagOptions,
   PluginListenerHandle,
 } from './definitions';
@@ -34,6 +36,10 @@ export class CapacitorNfcWeb extends WebPlugin implements CapacitorNfcPlugin {
 
   async makeReadOnly(): Promise<void> {
     this.unsupported('makeReadOnly');
+  }
+
+  async transceive(_options: TransceiveOptions): Promise<TransceiveResult> {
+    this.unsupported('transceive');
   }
 
   async share(_options: ShareTagOptions): Promise<void> {

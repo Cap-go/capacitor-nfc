@@ -10,6 +10,8 @@ const startButton = document.getElementById('start-scan');
 const stopButton = document.getElementById('stop-scan');
 const clearButton = document.getElementById('clear-log');
 const writeButton = document.getElementById('write-text');
+const transceiveButton = document.getElementById('transceive-btn');
+const transceiveInput = document.getElementById('transceive-input');
 const textInput = document.getElementById('text-input');
 const langInput = document.getElementById('lang-input');
 
@@ -96,13 +98,34 @@ async function refreshStatus() {
   }
 }
 
+function parseByteList(text) {
+  const parts = text.split(/[\s,]+/).filter(Boolean);
+  if (parts.length === 0) {
+    throw new Error('Provide at least one byte value.');
+  }
+  return parts.map((part) => {
+    if (!/^\d+$/.test(part)) {
+      throw new Error(`Invalid byte value: ${part}`);
+    }
+    const value = Number.parseInt(part, 10);
+    if (!Number.isFinite(value) || value < 0 || value > 255) {
+      throw new Error(`Invalid byte value: ${part}`);
+    }
+    return value;
+  });
+}
+
 startButton.addEventListener('click', async () => {
   try {
     sessionInvalidateAfterFirstRead = false;
-    await CapacitorNfc.startScanning({
+    const startOptions = {
       invalidateAfterFirstRead: false,
       alertMessage: 'Hold an NFC tag near the top of your device.',
-    });
+    };
+    if (Capacitor.getPlatform() === 'ios') {
+      startOptions.iosSessionType = 'tag';
+    }
+    await CapacitorNfc.startScanning(startOptions);
     sessionActive = true;
     updateSessionIndicator(true);
     appendLog('✅ Started scanning');
@@ -125,6 +148,16 @@ stopButton.addEventListener('click', async () => {
 clearButton.addEventListener('click', () => {
   logBuffer.length = 0;
   logOutput.textContent = 'Waiting for events…';
+});
+
+transceiveButton.addEventListener('click', async () => {
+  try {
+    const data = parseByteList(transceiveInput.value);
+    const { response } = await CapacitorNfc.transceive({ data });
+    appendLog('📨 transceive response', { response });
+  } catch (error) {
+    appendLog('❌ transceive failed', { message: error?.message ?? String(error) });
+  }
 });
 
 writeButton.addEventListener('click', async () => {
