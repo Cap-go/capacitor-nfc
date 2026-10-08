@@ -5,7 +5,7 @@ Read and write NFC tags from your Capacitor app on iOS and Android. A modern Cap
 <a href="https://capgo.app/?ref=plugin_nfc"><img src="https://capgo.app/readme-banner.svg?repo=Cap-go/capacitor-nfc" alt="Capgo - Instant updates for Capacitor" /></a>
 
 <div align="center">
-  <p><b>Capgo</b>: open-source live updates for Ionic and Capacitor apps. Ship OTA fixes and features instantly, without waiting for app store review.</p>
+  <p><b>Capgo</b>: push fixes to your Capacitor users in minutes, build signed iOS and Android apps without a Mac, and roll back in one click.</p>
   <h2><a href="https://capgo.app/register/?ref=plugin_nfc">➡️ Get started for free</a></h2>
   <p>14-day unlimited free trial. No credit card required</p>
   <p><a href="https://capgo.app/consulting/?ref=plugin_nfc">Missing a feature? We'll build the plugin for you 💪</a></p>
