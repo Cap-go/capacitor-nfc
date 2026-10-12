@@ -2,7 +2,7 @@
 
 Read and write NFC tags from your Capacitor app on iOS and Android. A modern Capacitor port of the battle-tested phonegap-nfc plugin.
 
-<a href="https://capgo.app/?ref=plugin_nfc"><img src="https://capgo.app/readme-banner.svg?repo=Cap-go/capacitor-nfc" alt="Capgo - Instant updates for Capacitor" /></a>
+<a href="https://capgo.app/?ref=plugin_nfc"><img src="https://capgo.app/readme-banner.svg?repo=Cap-go/capacitor-nfc" alt="Capgo - Build Capacitor apps with AI, ship updates instantly" /></a>
 
 <div align="center">
   <p><b>Capgo</b>: push fixes to your Capacitor users in minutes, build signed iOS and Android apps without a Mac, and roll back in one click.</p>
@@ -10,6 +10,8 @@ Read and write NFC tags from your Capacitor app on iOS and Android. A modern Cap
   <p>14-day unlimited free trial. No credit card required</p>
   <p><a href="https://capgo.app/consulting/?ref=plugin_nfc">Missing a feature? We'll build the plugin for you 💪</a></p>
 </div>
+
+> 🤖 **Building with an AI coding agent?** Install [Capgo skills](https://capgo.app/skills/?ref=plugin_nfc) so Claude Code, Codex, Cursor, Copilot, or Gemini CLI know how to install and use `@capgo/capacitor-nfc` in your Capacitor app: `npx skills add Cap-go/capgo-skills`. Then ask your agent: *"Add @capgo/capacitor-nfc to my Capacitor app and wire it up."* [Agent setup guides](https://capgo.app/agents/?ref=plugin_nfc) · [Hosted MCP](https://capgo.app/docs/ai/mcp/?ref=plugin_nfc)
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/Cap-go/capacitor-nfc/main/assets/github-social-preview.png" alt="@capgo/capacitor-nfc for Capacitor apps" width="300" />
