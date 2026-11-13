@@ -381,15 +381,13 @@ public class CapacitorNfcPlugin extends Plugin {
                         ndef.writeNdefMessage(message);
                         call.resolve();
                     }
-                    if (ndef.isConnected()) {
-                        ndef.close();
-                    }
+                    NfcConnectionHelper.closeQuietly(ndef);
                 } else if (allowFormat) {
                     NdefFormatable formatable = NdefFormatable.get(tag);
                     if (formatable != null) {
                         formatable.connect();
                         formatable.format(message);
-                        formatable.close();
+                        NfcConnectionHelper.closeQuietly(formatable);
                         call.resolve();
                     } else {
                         call.reject("Tag does not support NDEF formatting.");
@@ -480,26 +478,25 @@ public class CapacitorNfcPlugin extends Plugin {
                     try {
                         ndef.connect();
                         message = ndef.getNdefMessage();
-                        ndef.close();
+                        NfcConnectionHelper.closeQuietly(ndef);
                     } catch (IOException | FormatException ex) {
-                        try {
-                            ndef.close();
-                        } catch (IOException closeEx) {
-                            // Ignore close errors
-                        }
+                        NfcConnectionHelper.closeQuietly(ndef);
                     }
                 }
             }
         }
 
         Tag previous = lastTag.getAndSet(tag);
-        if (previous != null && previous != tag) {
-            synchronized (transceiveLock) {
-                closeTransceiveConnections();
+        try {
+            if (previous != null && previous != tag) {
+                synchronized (transceiveLock) {
+                    closeTransceiveConnections();
+                }
             }
+        } finally {
+            lastMessage.set(message);
+            emitTagEvent(tag, message);
         }
-        lastMessage.set(message);
-        emitTagEvent(tag, message);
     }
 
     private static byte[] jsArrayToBytes(JSArray array) throws IllegalArgumentException {
@@ -590,26 +587,14 @@ public class CapacitorNfcPlugin extends Plugin {
     }
 
     private void closeTransceiveConnections() {
-        if (connectedNfcV != null) {
-            try {
-                if (connectedNfcV.isConnected()) {
-                    connectedNfcV.close();
-                }
-            } catch (IOException ex) {
-                Log.w(TAG, "Failed to close NfcV connection", ex);
-            }
-            connectedNfcV = null;
-        }
-        if (connectedNfcA != null) {
-            try {
-                if (connectedNfcA.isConnected()) {
-                    connectedNfcA.close();
-                }
-            } catch (IOException ex) {
-                Log.w(TAG, "Failed to close NfcA connection", ex);
-            }
-            connectedNfcA = null;
-        }
+        NfcV nfcV = connectedNfcV;
+        connectedNfcV = null;
+        NfcConnectionHelper.closeQuietly(nfcV);
+
+        NfcA nfcA = connectedNfcA;
+        connectedNfcA = null;
+        NfcConnectionHelper.closeQuietly(nfcA);
+
         transceiveTag = null;
         defaultNfcATimeout = -1;
     }
