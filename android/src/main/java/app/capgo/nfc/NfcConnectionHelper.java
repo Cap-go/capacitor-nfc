@@ -22,7 +22,11 @@ final class NfcConnectionHelper {
                 tech.close();
             }
         } catch (Exception ex) {
-            Log.w(TAG, "Failed to close NFC technology connection", ex);
+            try {
+                Log.w(TAG, "Failed to close NFC technology connection", ex);
+            } catch (RuntimeException logError) {
+                // android.util.Log is unavailable in JVM unit tests without a device runtime.
+            }
         }
     }
 }
