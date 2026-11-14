@@ -73,6 +73,9 @@ public class CapacitorNfcPlugin extends Plugin {
 
     @Override
     protected void handleOnDestroy() {
+        synchronized (transceiveLock) {
+            closeTransceiveConnections();
+        }
         super.handleOnDestroy();
         unregisterStateReceiver();
         executor.shutdownNow();
@@ -109,6 +112,9 @@ public class CapacitorNfcPlugin extends Plugin {
     @PluginMethod
     public void stopScanning(PluginCall call) {
         readerModeRequested = false;
+        synchronized (transceiveLock) {
+            closeTransceiveConnections();
+        }
         disableReaderMode(true);
         call.resolve();
     }
@@ -235,19 +241,23 @@ public class CapacitorNfcPlugin extends Plugin {
                 return;
             }
 
+            boolean success = false;
             try {
                 ndef.connect();
-                boolean success = ndef.makeReadOnly();
-                ndef.close();
-                if (success) {
-                    call.resolve();
-                } else {
-                    call.reject("Failed to make the tag read only.");
-                }
+                success = ndef.makeReadOnly();
             } catch (SecurityException | IllegalStateException e) {
                 call.reject("Tag connection lost.", e);
+                return;
             } catch (IOException e) {
                 call.reject("Failed to make the tag read only.", e);
+                return;
+            } finally {
+                NfcConnectionHelper.closeQuietly(ndef);
+            }
+            if (success) {
+                call.resolve();
+            } else {
+                call.reject("Failed to make the tag read only.");
             }
         });
     }
@@ -370,6 +380,7 @@ public class CapacitorNfcPlugin extends Plugin {
                 closeTransceiveConnections();
             }
             Ndef ndef = Ndef.get(tag);
+            NdefFormatable formatable = null;
             try {
                 if (ndef != null) {
                     ndef.connect();
@@ -381,15 +392,11 @@ public class CapacitorNfcPlugin extends Plugin {
                         ndef.writeNdefMessage(message);
                         call.resolve();
                     }
-                    if (ndef.isConnected()) {
-                        ndef.close();
-                    }
                 } else if (allowFormat) {
-                    NdefFormatable formatable = NdefFormatable.get(tag);
+                    formatable = NdefFormatable.get(tag);
                     if (formatable != null) {
                         formatable.connect();
                         formatable.format(message);
-                        formatable.close();
                         call.resolve();
                     } else {
                         call.reject("Tag does not support NDEF formatting.");
@@ -401,6 +408,9 @@ public class CapacitorNfcPlugin extends Plugin {
                 call.reject("Tag connection lost.", e);
             } catch (IOException | FormatException e) {
                 call.reject("Failed to write NDEF message.", e);
+            } finally {
+                NfcConnectionHelper.closeQuietly(ndef);
+                NfcConnectionHelper.closeQuietly(formatable);
             }
         });
     }
@@ -480,26 +490,25 @@ public class CapacitorNfcPlugin extends Plugin {
                     try {
                         ndef.connect();
                         message = ndef.getNdefMessage();
-                        ndef.close();
-                    } catch (IOException | FormatException ex) {
-                        try {
-                            ndef.close();
-                        } catch (IOException closeEx) {
-                            // Ignore close errors
-                        }
+                        NfcConnectionHelper.closeQuietly(ndef);
+                    } catch (IOException | FormatException | SecurityException | IllegalStateException ex) {
+                        NfcConnectionHelper.closeQuietly(ndef);
                     }
                 }
             }
         }
 
         Tag previous = lastTag.getAndSet(tag);
-        if (previous != null && previous != tag) {
-            synchronized (transceiveLock) {
-                closeTransceiveConnections();
+        try {
+            if (previous != null && previous != tag) {
+                synchronized (transceiveLock) {
+                    closeTransceiveConnections();
+                }
             }
+        } finally {
+            lastMessage.set(message);
+            emitTagEvent(tag, message);
         }
-        lastMessage.set(message);
-        emitTagEvent(tag, message);
     }
 
     private static byte[] jsArrayToBytes(JSArray array) throws IllegalArgumentException {
@@ -590,26 +599,14 @@ public class CapacitorNfcPlugin extends Plugin {
     }
 
     private void closeTransceiveConnections() {
-        if (connectedNfcV != null) {
-            try {
-                if (connectedNfcV.isConnected()) {
-                    connectedNfcV.close();
-                }
-            } catch (IOException ex) {
-                Log.w(TAG, "Failed to close NfcV connection", ex);
-            }
-            connectedNfcV = null;
-        }
-        if (connectedNfcA != null) {
-            try {
-                if (connectedNfcA.isConnected()) {
-                    connectedNfcA.close();
-                }
-            } catch (IOException ex) {
-                Log.w(TAG, "Failed to close NfcA connection", ex);
-            }
-            connectedNfcA = null;
-        }
+        NfcV nfcV = connectedNfcV;
+        connectedNfcV = null;
+        NfcConnectionHelper.closeQuietly(nfcV);
+
+        NfcA nfcA = connectedNfcA;
+        connectedNfcA = null;
+        NfcConnectionHelper.closeQuietly(nfcA);
+
         transceiveTag = null;
         defaultNfcATimeout = -1;
     }
@@ -659,13 +656,13 @@ public class CapacitorNfcPlugin extends Plugin {
             // This contains the TLV header
             byte[] firstPages = mifare.readPages(4);
             if (firstPages == null || firstPages.length < 4) {
-                mifare.close();
+                NfcConnectionHelper.closeQuietly(mifare);
                 return null;
             }
 
             // Check for NDEF TLV (Type = 0x03 per NFC Forum spec)
             if (firstPages[0] != 0x03) {
-                mifare.close();
+                NfcConnectionHelper.closeQuietly(mifare);
                 return null;
             }
 
@@ -679,7 +676,7 @@ public class CapacitorNfcPlugin extends Plugin {
             } else {
                 // Extended format: 0xFF + 2-byte length
                 if (firstPages.length < 4) {
-                    mifare.close();
+                    NfcConnectionHelper.closeQuietly(mifare);
                     return null;
                 }
                 ndefLength = ((firstPages[2] & 0xFF) << 8) | (firstPages[3] & 0xFF);
@@ -688,7 +685,7 @@ public class CapacitorNfcPlugin extends Plugin {
 
             if (ndefLength == 0 || ndefLength > 1024) {
                 // Reasonable upper limit
-                mifare.close();
+                NfcConnectionHelper.closeQuietly(mifare);
                 return null;
             }
 
@@ -732,7 +729,7 @@ public class CapacitorNfcPlugin extends Plugin {
                 }
             }
 
-            mifare.close();
+            NfcConnectionHelper.closeQuietly(mifare);
 
             // Check if we have enough data
             if (bytesRead < totalBytesNeeded) {
@@ -763,18 +760,10 @@ public class CapacitorNfcPlugin extends Plugin {
             }
         } catch (SecurityException e) {
             // Tag became stale - this happens if tag is removed or too much time passed
-            try {
-                mifare.close();
-            } catch (Exception closeEx) {
-                // Ignore close errors
-            }
+            NfcConnectionHelper.closeQuietly(mifare);
             return null;
         } catch (IOException e) {
-            try {
-                mifare.close();
-            } catch (IOException closeEx) {
-                // Ignore close errors
-            }
+            NfcConnectionHelper.closeQuietly(mifare);
             return null;
         }
     }
